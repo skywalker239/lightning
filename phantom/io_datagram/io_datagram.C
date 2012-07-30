@@ -1,0 +1,90 @@
+#include "io_datagram.H"
+#include "handler.H"
+
+#include <phantom/module.H>
+
+#include <pd/base/exception.H>
+#include <pd/base/fd_guard.H>
+#include <pd/base/log.H>
+#include <pd/bq/bq_util.H>
+
+namespace phantom {
+
+MODULE(io_datagram);
+
+io_datagram_t::config_t::config_t() throw()
+    : io_t::config_t(),
+      handler(),
+      reuse_addr(true),
+      poll_interval(interval_second)
+{}
+
+void io_datagram_t::config_t::check(const in_t::ptr_t& ptr) const {
+    io_t::config_t::check(ptr);
+
+    if(!handler) {
+        config::error(ptr, "handler is required");
+    }
+
+    if(poll_interval > interval_minute) {
+        config::error(ptr, "poll interval is too big");
+    }
+}
+
+namespace io_datagram {
+config_binding_sname(io_datagram_t);
+config_binding_type(io_datagram_t, handler_t);
+config_binding_value(io_datagram_t, handler);
+config_binding_value(io_datagram_t, reuse_addr);
+config_binding_value(io_datagram_t, poll_interval);
+config_binding_parent(io_datagram_t, io_t, 1);
+}  // namespace io_datagram
+
+io_datagram_t::io_datagram_t(const string_t& name, const config_t& config)
+    : io_t(name, config),
+      fd_(-1),
+      reuse_addr_(config.reuse_addr),
+      handler_(*config.handler)
+{}
+
+io_datagram_t::~io_datagram_t() throw()
+{}
+
+void io_datagram_t::init() {
+    const netaddr_t& netaddr = bind_addr();
+
+    fd_ = socket(netaddr.sa->sa_family, SOCK_DGRAM, 0);
+    if(fd_ < 0) {
+        throw exception_sys_t(log::error, errno, "socket: %m");
+    }
+
+    try {
+        bq_fd_setup(fd_);
+        fd_setup(fd_);
+
+        if(reuse_addr_) {
+            int i = 1;
+            if(setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i)) < 0) {
+                throw exception_sys_t(log::error, errno, "setsockopt, SO_REUSEADDR, 1: %m");
+            }
+        }
+
+            if(::bind(fd_, netaddr.sa, netaddr.sa_len) < 0) {
+                throw exception_sys_t(log::error, errno, "bind: %m");
+            }
+    } catch(...) {
+        ::close(fd_);
+        fd_ = -1;
+        throw;
+    }
+}
+
+void io_datagram_t::fini() {
+    ::close(fd_);
+}
+
+void io_datagram_t::stat(out_t& out, bool clear) {
+    handler_.stat(out, clear);
+}
+
+}  // namespace phantom
