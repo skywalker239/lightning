@@ -1,0 +1,34 @@
+#pragma once
+
+#include <pd/base/ref.H>
+#include <pd/base/string.H>
+#include <stdint.h>
+
+namespace pd {
+
+class instance_t : public ref_count_atomic_t {
+public:
+    instance_t();
+
+    void set_value(const string_t& value_id,
+                   const string_t& value);
+
+    bool commit(const string_t& value_id);
+
+    bool committed() const;
+
+    const string_t& value() const;
+
+    void reset(uint64_t instance_id);
+
+    uint64_t instance_id() const;
+
+    static const uint64_t invalid_instance_id = ~0ULL;
+private:
+    uint64_t instance_id_;
+    string_t value_id_;
+    string_t value_;
+    bool committed_;
+};
+
+}  // namespace pd
