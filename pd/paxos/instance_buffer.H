@@ -2,6 +2,7 @@
 
 #include "commit_tracker.H"
 #include "instance.H"
+#include <pd/base/ref.H>
 #include <pd/base/thr.H>
 #include <vector>
 
@@ -33,7 +34,7 @@ public:
     result_t committed(uint64_t instance_id);
 
     result_t get(uint64_t instance_id,
-                 instance_t* instance) const;
+                 ref_t<instance_t>* instance) const;
 private:
     result_t lookup(uint64_t instance_id,
                     instance_t** instance);
@@ -43,7 +44,7 @@ private:
     const size_t max_size_;
     size_t begin_;
 
-    std::vector<instance_t> instances_;
+    std::vector<ref_t<instance_t> > instances_;
 
     mutable thr::spinlock_t lock_;
 };

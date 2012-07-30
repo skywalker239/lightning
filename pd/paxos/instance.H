@@ -29,6 +29,8 @@ private:
     string_t value_id_;
     string_t value_;
     bool committed_;
+
+    friend class ref_t<instance_t>;
 };
 
 }  // namespace pd
