@@ -6,6 +6,7 @@
 #include <pd/base/exception.H>
 #include <pd/base/fd_guard.H>
 #include <pd/base/log.H>
+#include <pd/bq/bq_job.H>
 #include <pd/bq/bq_util.H>
 
 namespace phantom {
@@ -48,7 +49,14 @@ io_datagram_t::io_datagram_t(const string_t& name, const config_t& config)
 {}
 
 io_datagram_t::~io_datagram_t() throw()
-{}
+{
+    if(fd_ >= 0) {
+        if(::close(fd_) < 0) {
+            log_error("~io_datagram_t, close: %m");
+        }
+        fd_ = -1;
+    }
+}
 
 void io_datagram_t::init() {
     const netaddr_t& netaddr = bind_addr();
@@ -79,8 +87,59 @@ void io_datagram_t::init() {
     }
 }
 
+void io_datagram_t::run() {
+    // No multithreaded recv for now.
+    int fd = ::dup(fd_);
+    fd_guard_t fd_guard(fd);
+
+    bq_job_t<typeof(&io_datagram_t::loop)>::create(
+        name,
+        scheduler.bq_thr(),
+        *this,
+        &io_datagram_t::loop,
+        fd);
+    fd_guard.relax();
+}
+
+void io_datagram_t::loop(int fd) const {
+    fd_guard_t fd_guard(fd);
+
+    bq_fd_setup(fd);
+    fd_setup(fd);
+
+    const netaddr_t& local_addr = bind_addr();
+
+    while(true) {
+        netaddr_t* remote_addr = new_netaddr();
+
+        class netaddr_guard_t {
+        public:
+            inline netaddr_guard_t(netaddr_t* addr) throw() : addr_(addr) { }
+            inline ~netaddr_guard_t() throw() { delete addr_; }
+        private:
+            netaddr_t* addr_;
+        } netaddr_guard(remote_addr);
+
+        unsigned char buffer[maximum_datagram_size];
+        ssize_t read_bytes = bq_recvfrom(fd,
+                                         buffer,
+                                         sizeof(buffer),
+                                         remote_addr->sa,
+                                         &remote_addr->sa_len,
+                                         NULL);
+        if(read_bytes < 0) {
+            throw exception_sys_t(log::error, errno, "recvfrom: %m");
+        }
+
+        handler_.handle_datagram(buffer, read_bytes, local_addr, *remote_addr);
+    }
+}
+
 void io_datagram_t::fini() {
-    ::close(fd_);
+    if(::close(fd_) < 0) {
+        throw exception_sys_t(log::error, errno, "close(): %m");
+    }
+    fd_ = -1;
 }
 
 void io_datagram_t::stat(out_t& out, bool clear) {

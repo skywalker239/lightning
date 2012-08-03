@@ -38,14 +38,13 @@ private:
     virtual const netaddr_t& bind_addr() const throw() = 0;
     virtual netaddr_t* new_netaddr() const = 0;
     virtual void fd_setup(int fd) const = 0;
-    virtual const fd_ctl_t* ctl() const = 0;
 
     virtual void init();
     virtual void run();
     virtual void stat(out_t& out, bool clear);
     virtual void fini();
 
-    void loop(int fd);
+    void loop(int fd) const;
 
     int fd_;
     bool reuse_addr_;
