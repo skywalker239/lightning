@@ -10,7 +10,7 @@ namespace io_datagram {
 class handler_t {
 public:
     virtual void handle_datagram(
-        const unsigned char* data,
+        const char* data,
         size_t length,
         const netaddr_t& local_addr,
         const netaddr_t& remote_addr) = 0;

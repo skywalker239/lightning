@@ -120,7 +120,7 @@ void io_datagram_t::loop(int fd) const {
             netaddr_t* addr_;
         } netaddr_guard(remote_addr);
 
-        unsigned char buffer[maximum_datagram_size];
+        char buffer[maximum_datagram_size];
         ssize_t read_bytes = bq_recvfrom(fd,
                                          buffer,
                                          sizeof(buffer),
