@@ -6,6 +6,8 @@
 #include <pd/base/netaddr.H>
 #include <pd/base/time.H>
 
+#pragma GCC visibility push(default)
+
 namespace phantom {
 
 namespace io_datagram {
@@ -53,3 +55,5 @@ private:
 };
 
 }  // namespace phantom
+
+#pragma GCC visibility pop
