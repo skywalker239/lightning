@@ -9,6 +9,7 @@ include /usr/share/phantom/module.mk
 $(eval $(call MODULE,io_datagram))
 $(eval $(call MODULE,io_datagram/ipv4))
 $(eval $(call MODULE,io_datagram/handler_echo_log))
+$(eval $(call MODULE,io_datagram/multicast_ipv4))
 
 include /usr/share/phantom/opts.mk
 

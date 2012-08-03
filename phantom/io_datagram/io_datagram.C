@@ -67,9 +67,6 @@ void io_datagram_t::init() {
     }
 
     try {
-        bq_fd_setup(fd_);
-        fd_setup(fd_);
-
         if(reuse_addr_) {
             int i = 1;
             if(setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(i)) < 0) {
