@@ -10,6 +10,7 @@ $(eval $(call MODULE,io_learner,,paxos))
 $(eval $(call MODULE,io_datagram))
 $(eval $(call MODULE,io_datagram/ipv4))
 $(eval $(call MODULE,io_datagram/handler_echo_log))
+$(eval $(call MODULE,io_datagram/handler_learner,,,-lprotobuf))
 $(eval $(call MODULE,io_datagram/multicast_ipv4))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude
