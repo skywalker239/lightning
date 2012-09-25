@@ -32,6 +32,35 @@ public:
     io_zookeeper_t(const string_t& name, const config_t& config);
     ~io_zookeeper_t() throw() {}
 
+    struct stat_t {
+        bool valid;
+        bool exists;
+        string_t value;
+        struct Stat stat;
+
+        stat_t()
+            : valid(false), exists(false), ref_count(0)
+        {}
+        
+        //! HACK for map::insert to work
+        stat_t(const stat_t& rhs)
+            : valid(rhs.valid),
+              exists(rhs.exists),
+              value(rhs.value),
+              stat(rhs.stat),
+              ref_count(rhs.ref_count)
+        {}
+
+        ~stat_t() {
+        }
+
+        bq_cond_t cond;
+        int ref_count;
+    };
+
+    stat_t* add_var_ref(const string_t& key);
+    void remove_var_ref(const string_t& key);
+
 private:
     virtual void init();
 
@@ -95,20 +124,6 @@ private:
     struct string_hash_t {
         size_t operator()(const string_t& s) const {
             return s.str().fnv<ident_t>();
-        }
-    };
-
-    struct stat_t {
-        bool valid;
-        bool exists;
-        string_t value;
-        struct Stat stat;
-
-        stat_t()
-            : valid(false), exists(false)
-        {}
-
-        ~stat_t() {
         }
     };
 

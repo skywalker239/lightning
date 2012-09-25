@@ -33,10 +33,50 @@ io_zookeeper_t::io_zookeeper_t(const string_t& name, const config_t& config)
       todo_last_(&todo_list_)
 {
     for(config::list_t<string_t>::ptr_t p = config.keys.ptr(); p; ++p) {
-        var_map_.insert(std::make_pair(p.val(), stat_t()));
+        (void) add_var_ref(p.val());
     }
 }
 
+io_zookeeper_t::stat_t* io_zookeeper_t::add_var_ref(const string_t& key) {
+    thr::spinlock_guard_t map_guard(var_map_lock_);
+    auto iter = var_map_.insert(std::make_pair(key, stat_t()));
+    stat_t& var_stat = iter.first->second;
+
+    if(iter.second) {
+        bq_cond_guard_t todo_guard(todo_cond_);
+        new todo_item_t(todo_item_t::WATCH, key, *this);
+        todo_cond_.send();
+    }
+
+    bq_cond_guard_t ref_guard(var_stat.cond);
+    int rc = ++var_stat.ref_count;
+    ref_guard.relax();
+    map_guard.relax();
+
+    MKCSTR(key_z, key);
+    log_info("Added key '%s', refcount is %d", key_z, rc);
+
+    return &var_stat;
+}
+
+void io_zookeeper_t::remove_var_ref(const string_t& key) {
+    thr::spinlock_guard_t map_guard(var_map_lock_);
+    auto iter = var_map_.find(key);
+
+    assert(iter != var_map_.end());
+    stat_t& var_stat = iter->second;
+    bq_cond_guard_t ref_guard(var_stat.cond);
+    int rc = --var_stat.ref_count;
+    if(rc == 0) {
+        var_map_.erase(key);
+    }
+    ref_guard.relax();
+    map_guard.relax();
+
+    MKCSTR(key_z, key);
+    log_info("Removed key '%s', refcount is now %d", key_z, rc);
+}
+    
 void io_zookeeper_t::init() {
     zoo_set_debug_level(ZOO_LOG_LEVEL_DEBUG);
     if(zookeeper_log_path_.size() != 0) {
@@ -52,7 +92,6 @@ void io_zookeeper_t::init() {
     bq_cond_guard_t guard(connected_cond_);
     do_connect();
 }
-
 
 void io_zookeeper_t::do_connect() {
     assert(zhandle_ == NULL);
@@ -272,6 +311,14 @@ void io_zookeeper_t::set_watches() {
 }
 
 void io_zookeeper_t::watch_node(const string_t& key) {
+    MKCSTR(key_z, key);
+    thr::spinlock_guard_t map_guard(var_map_lock_);
+    if(var_map_.find(key) == var_map_.end()) {
+        log_info("Key '%s' removed, not watching", key_z);
+        return;
+    }
+    map_guard.relax();
+
     bq_cond_guard_t connected_guard(connected_cond_);
 
     if(!connected_) {
@@ -281,7 +328,6 @@ void io_zookeeper_t::watch_node(const string_t& key) {
     }
 
     assert(connected_);
-    MKCSTR(key_z, key);
     int rc = zoo_awexists(zhandle_,
                           key_z,
                           &io_zookeeper_t::node_watcher,
@@ -306,6 +352,14 @@ void io_zookeeper_t::watch_node(const string_t& key) {
 }
 
 void io_zookeeper_t::get_node(const string_t& key) {
+    MKCSTR(key_z, key);
+    thr::spinlock_guard_t map_guard(var_map_lock_);
+    if(var_map_.find(key) == var_map_.end()) {
+        log_info("Key '%s' removed, not getting", key_z);
+        return;
+    }
+    map_guard.relax();
+
     bq_cond_guard_t connected_guard(connected_cond_);
 
     if(!connected_) {
@@ -315,7 +369,6 @@ void io_zookeeper_t::get_node(const string_t& key) {
     }
 
     assert(connected_);
-    MKCSTR(key_z, key);
     int rc = zoo_awget(zhandle_,
                        key_z,
                        &io_zookeeper_t::node_watcher,
@@ -431,29 +484,51 @@ void io_zookeeper_t::update_node(const string_t& key,
                                  int vallen,
                                  const struct Stat* stat)
 {
-    thr::spinlock_guard_t guard(var_map_lock_);
-    stat_t& var_stat = var_map_[key];
+    MKCSTR(key_z, key);
+    thr::spinlock_guard_t map_guard(var_map_lock_);
+    auto iter = var_map_.find(key);
+    if(iter == var_map_.end()) {
+        log_info("update_node: key '%s' not found", key_z);
+        return;
+    }
+    stat_t& var_stat = iter->second;
+
+    bq_cond_guard_t var_guard(var_stat.cond);
+    map_guard.relax();
+
     var_stat.valid = true;
     var_stat.exists = true;
     var_stat.value = string_t::ctor_t(vallen)(str_t(value, vallen));
     var_stat.stat = *stat;
-    guard.relax();
 
-    MKCSTR(key_z, key);
+    var_stat.cond.send(true);
+    var_guard.relax();
+
     MKCSTR(val_z, var_stat.value);
-    log_info("update_node '%s' = '%s' (czxid=%ld mzxid=%ld ctime=%ld mtime=%ld version=%d cversion=%d aversion=%d ephemeralOwner=%ld dataLength=%d numChildren=%d pzxid=%ld", key_z, val_z, stat->czxid, stat->mzxid, stat->ctime, stat->mtime, stat->version, stat->cversion, stat->aversion, stat->ephemeralOwner, stat->dataLength, stat->numChildren, stat->pzxid);
+    log_info("update_node '%s' = '%s' (czxid=%ld mzxid=%ld ctime=%ld mtime=%ld version=%d cversion=%d aversion=%d ephemeralOwner=%ld dataLength=%d numChildren=%d pzxid=%ld)", key_z, val_z, stat->czxid, stat->mzxid, stat->ctime, stat->mtime, stat->version, stat->cversion, stat->aversion, stat->ephemeralOwner, stat->dataLength, stat->numChildren, stat->pzxid);
 }
 
 void io_zookeeper_t::set_no_node(const string_t& key) {
-    thr::spinlock_guard_t guard(var_map_lock_);
-    stat_t& var_stat = var_map_[key];
+    MKCSTR(key_z, key);
+    thr::spinlock_guard_t map_guard(var_map_lock_);
+    auto iter = var_map_.find(key);
+    if(iter == var_map_.end()) {
+        log_info("set_no_node: key '%s' not found", key_z);
+        return;
+    }
+    stat_t& var_stat = iter->second;
+
+    bq_cond_guard_t var_guard(var_stat.cond);
+    map_guard.relax();
+
     var_stat.valid = true;
     var_stat.exists = false;
     var_stat.value = string_t::empty;
-    guard.relax();
 
-    string_t key_z = string_t::ctor_t(key.size() + 1)(key)('\0');
-    log_info("set_no_node '%s'", key_z.ptr());
+    var_stat.cond.send(true);
+    var_guard.relax();
+
+    log_info("set_no_node '%s'", key_z);
 }
 
 io_zookeeper_t::todo_item_t::todo_item_t(todo_item_t::type_t _type,
