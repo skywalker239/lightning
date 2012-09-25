@@ -14,6 +14,8 @@
 
 #include <zookeeper.h>
 
+#pragma GCC visibility push(default)
+
 namespace phantom {
 
 class io_zookeeper_t : public io_t {
@@ -61,6 +63,11 @@ public:
     stat_t* add_var_ref(const string_t& key);
     void remove_var_ref(const string_t& key);
 
+    //! Must be called from within a bq thread.
+    //  Resets key to value, ignoring version.
+    //  The corresponding key must exist in ZK.
+    void set(const string_t& key, const string_t& value);
+
 private:
     virtual void init();
 
@@ -80,6 +87,8 @@ private:
     void watch_node(const string_t& key);
     //! Calls zoo_awget at key. Must only be called from run().
     void get_node(const string_t& key);
+    //! Calls zoo_aset at key. Must only be called from run().
+    void set_node(const string_t& key, void* set_data);
 
     virtual void stat(out_t&, bool) {}
 
@@ -114,6 +123,10 @@ private:
     static void stat_callback(int rc,
                               const struct Stat* stat,
                               const void* data);
+
+    static void set_callback(int rc,
+                             const struct Stat* stat,
+                             const void* data);
     
     struct string_cmp_t {
         bool operator()(const string_t& a, const string_t& b) const {
@@ -148,7 +161,8 @@ private:
 
         enum type_t {
             WATCH,
-            GET
+            GET,
+            SET
         };
         
         type_t type;
@@ -156,9 +170,12 @@ private:
 
         io_zookeeper_t& io_zookeeper;
 
+        void* spec;
+
         todo_item_t(type_t _type,
                     const string_t& _key, 
-                    io_zookeeper_t& _io_zookeeeper);
+                    io_zookeeper_t& _io_zookeeeper,
+                    void* _spec = NULL);
 
         ~todo_item_t();
     };
@@ -174,3 +191,5 @@ private:
 };
 
 }  // namespace phantom
+
+#pragma GCC visibility pop

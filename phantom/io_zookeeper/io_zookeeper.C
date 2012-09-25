@@ -32,8 +32,9 @@ io_zookeeper_t::io_zookeeper_t(const string_t& name, const config_t& config)
       todo_list_(NULL),
       todo_last_(&todo_list_)
 {
+    log_info("io_zookeeper_t ctor");
     for(config::list_t<string_t>::ptr_t p = config.keys.ptr(); p; ++p) {
-        (void) add_var_ref(p.val());
+        var_map_.insert(std::make_pair(p.val(), stat_t()));
     }
 }
 
@@ -148,6 +149,7 @@ void io_zookeeper_t::run() {
         assert(todo_list_);
         todo_item_t::type_t type = todo_list_->type;
         string_t key = todo_list_->key;
+        void* spec = todo_list_->spec;
         delete todo_list_;
         guard.relax();
 
@@ -157,6 +159,9 @@ void io_zookeeper_t::run() {
                 break;
             case todo_item_t::GET:
                 get_node(key);
+                break;
+            case todo_item_t::SET:
+                set_node(key, spec);
                 break;
             default:
                 throw exception_log_t(log::error, "unknown type %d", type);
@@ -260,7 +265,69 @@ struct callback_data_t {
     {}
 };
 
+struct set_data_t {
+    io_zookeeper_t* iozk;
+    string_t value;
+    bq_cond_t cond;
+
+    set_data_t(io_zookeeper_t* _iozk, const string_t& _value)
+        : iozk(_iozk), value(_value)
+    {}
+};
+
 }  // anonymous namespace
+
+void io_zookeeper_t::set(const string_t& key, const string_t& value) {
+    set_data_t set_data(this, value);
+
+    bq_cond_guard_t set_guard(set_data.cond);
+    bq_cond_guard_t todo_guard(todo_cond_);
+    new todo_item_t(todo_item_t::SET, key, *this, (void*) &set_data);
+    todo_cond_.send();
+    todo_guard.relax();
+
+    if(!bq_success(set_data.cond.wait(NULL))) {
+        throw exception_sys_t(log::error, errno, "set_data.cond.wait: %m");
+    }
+}
+
+
+void io_zookeeper_t::set_node(const string_t& key,
+                              void* data)
+{
+    set_data_t* set_data = reinterpret_cast<set_data_t*>(data);
+    const string_t& value = set_data->value;
+
+    bq_cond_guard_t connected_guard(connected_cond_);
+
+    if(!connected_) {
+        if(!bq_success(connected_cond_.wait(NULL))) {
+            throw exception_sys_t(log::error, errno, "connected_cond.wait: %m");
+        }
+    }
+
+    assert(connected_);
+    MKCSTR(key_z, key);
+    int rc = zoo_aset(zhandle_,
+                      key_z,
+                      value.ptr(),
+                      value.size(),
+                      -1, // clobber previous version
+                      &io_zookeeper_t::set_callback,
+                      data);
+    if(rc == ZOK) {
+        return;
+    } else if(rc == ZINVALIDSTATE) {
+        bq_cond_guard_t todo_guard(todo_cond_);
+        new todo_item_t(todo_item_t::SET, key, *this, data);
+        todo_cond_.send();
+    } else {
+        throw exception_sys_t(log::error,
+                              errno,
+                              "zoo_awget returned %d (%m)",
+                              rc);
+    }
+}
 
 void io_zookeeper_t::global_watcher(zhandle_t*,
                                     int type,
@@ -465,7 +532,6 @@ void io_zookeeper_t::stat_callback(int rc,
     io_zookeeper_t* iozk = callback_data->iozk;
     const string_t& path = callback_data->path;
 
-    bq_cond_guard_t guard(iozk->connected_cond_);
     if(rc == ZOK) {
         bq_cond_guard_t todo_guard(iozk->todo_cond_);
         new todo_item_t(todo_item_t::GET, path, *iozk);
@@ -475,6 +541,24 @@ void io_zookeeper_t::stat_callback(int rc,
     } else {
         throw exception_log_t(log::error,
                               "stat_callback got rc %d",
+                              rc);
+    }
+}
+
+void io_zookeeper_t::set_callback(int rc,
+                                  const struct Stat* stat,
+                                  const void* data)
+{
+    set_data_t* set_data = (set_data_t*) data;
+
+    Stat_guard_t stat_guard(stat);
+
+    if(rc == ZOK) {
+        bq_cond_guard_t set_guard(set_data->cond);
+        set_data->cond.send();
+    } else {
+        throw exception_log_t(log::error,
+                              "set_callback got rc %d",
                               rc);
     }
 }
@@ -533,10 +617,12 @@ void io_zookeeper_t::set_no_node(const string_t& key) {
 
 io_zookeeper_t::todo_item_t::todo_item_t(todo_item_t::type_t _type,
                                          const string_t& _key,
-                                         io_zookeeper_t& _io_zookeeper)
+                                         io_zookeeper_t& _io_zookeeper,
+                                         void* _spec)
     : type(_type),
       key(_key),
-      io_zookeeper(_io_zookeeper)
+      io_zookeeper(_io_zookeeper),
+      spec(_spec)
 {
     *(me = io_zookeeper.todo_last_) = this;
     *(io_zookeeper.todo_last_ = &next) = NULL;

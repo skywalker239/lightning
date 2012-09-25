@@ -76,8 +76,8 @@ int var_base_t::wait(int old_version) {
     return version_;
 }
 
-bool var_base_t::set(const string_t&, int) {
-    return false;
+void var_base_t::set(const string_t& value) {
+    io_zookeeper_->set(key_, value);
 }
 
 bool var_base_t::exists() const {
@@ -90,6 +90,10 @@ int var_base_t::version() const {
 
 const string_t& var_base_t::value_string() const {
     return value_string_;
+}
+
+const string_t& var_base_t::key() const {
+    return key_;
 }
 
 }  // namespace pd

@@ -31,22 +31,17 @@ public:
     //  old_version.
     int wait(int old_version);
 
-    //! Resets the variable to a new value.
-    //  If version is kDeletedVersion, attempts to create the node in ZK.
-    //  If version is kAnyVersion, assumes that the node exists and
-    //  overwrites it unconditionally.
-    //  Otherwise assumes that the node exists and tries to update it if
-    //  it has the given version.
-    //
-    //  Blocks until the corresponding ZK call returns and returns true
-    //  on success.
-    bool set(const string_t& value, int version);
+    //! Resets the variable to a new value. Blocks until ZK call completes.
+    //  Does not reset the local copy (i.e. call set() and then update).
+    void set(const string_t& value);
 
     bool exists() const;
 
     int version() const;
 
     const string_t& value_string() const;
+
+    const string_t& key() const;
 protected:
     int version_;
     string_t value_string_;
@@ -55,9 +50,12 @@ protected:
     //  data the descendant class is interested in.
     virtual void update_impl() {}
 private:
+    var_base_t(const var_base_t&) = delete;
+    var_base_t& operator=(const var_base_t&) = delete;
+
     void update_internal();
 
-    const string_t& key_;
+    string_t key_;
 
     phantom::io_zookeeper_t* io_zookeeper_;
     phantom::io_zookeeper_t::stat_t* stat_;
