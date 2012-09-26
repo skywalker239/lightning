@@ -17,6 +17,7 @@ include /usr/share/phantom/module.mk
 #$(eval $(call MODULE,io_toy_zk_client,,vars))
 $(eval $(call MODULE,io_zclient,,,))
 $(eval $(call MODULE,io_zhandle,,,zookeeper_mt))
+$(eval $(call MODULE,io_zconf,,,))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude -I /home/skywalker/czk/include/c-client-src
 
