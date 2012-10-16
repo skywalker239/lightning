@@ -3,18 +3,18 @@
 
 namespace pd {
 
-using ::phantom::io_zookeeper_t;
+using ::phantom::io_zconf_t;
 
-var_base_t::var_base_t(const string_t& key, io_zookeeper_t* io_zookeeper)
-    : version_(kInvalidVersion),
+var_base_t::var_base_t(const string_t& key, io_zconf_t* io_zconf)
+    : version_(kAnyVersion),
       key_(key),
-      io_zookeeper_(io_zookeeper),
-      stat_(io_zookeeper_->add_var_ref(key))
+      io_zconf_(io_zconf),
+      stat_(io_zconf_->add_var_ref(key))
 {}
 
 var_base_t::~var_base_t() {
-    io_zookeeper_->remove_var_ref(key_);
     stat_ = NULL;
+    io_zconf_->remove_var_ref(key_);
 }
 
 int var_base_t::update() {
@@ -44,8 +44,8 @@ void var_base_t::update_internal() {
     }
 
     assert(stat_->valid);
-    version_ = stat_->exists ? stat_->stat.version : kDeletedVersion;
-    value_string_ = stat_->exists ? stat_->value : string_t::empty;
+    version_ = stat_->stat.version;
+    value_string_ = stat_->value;
 }
 
 int var_base_t::wait(int old_version) {
@@ -76,12 +76,8 @@ int var_base_t::wait(int old_version) {
     return version_;
 }
 
-void var_base_t::set(const string_t& value) {
-    io_zookeeper_->set(key_, value);
-}
-
-bool var_base_t::exists() const {
-    return version_ >= 0;
+bool var_base_t::set(const string_t& value, int version) {
+    return io_zconf_->set(key_, value, version);
 }
 
 int var_base_t::version() const {

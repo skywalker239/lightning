@@ -5,7 +5,7 @@
 #include <pd/base/config_list.H>
 #include <pd/vars/var_base.H>
 
-#include <phantom/io_zookeeper/io_zookeeper.H>
+#include <phantom/io_zconf/io_zconf.H>>
 
 #include <vector>
 
@@ -14,7 +14,7 @@ namespace phantom {
 class io_toy_zk_client_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
-        config::objptr_t<io_zookeeper_t> zookeeper;
+        config::objptr_t<io_zconf_t> zconf;
         config::list_t<string_t> keys;
         string_t set_key;
 
@@ -37,7 +37,7 @@ private:
 
     void set_loop();
 
-    io_zookeeper_t& zookeeper_;
+    io_zconf_t& zconf_;
     var_base_t set_var_;
     std::vector<var_base_t*> vars_;
 };

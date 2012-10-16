@@ -28,6 +28,10 @@ io_zhandle_t::io_zhandle_t(const string_t& name, const config_t& config)
       clients_(NULL)
 {}
 
+io_zhandle_t::~io_zhandle_t() {
+    assert(clients_ == NULL);
+}
+
 void io_zhandle_t::lock() {
     connected_cond_.lock();
 }
@@ -99,7 +103,7 @@ void io_zhandle_t::do_connect() {
     const int kRecvTimeout = 5000;
 
     assert(zhandle_ == NULL);
-    log_info("io_zhandle connecting to %s", servers_z_.ptr());
+    log_debug("io_zhandle connecting to %s", servers_z_.ptr());
     zhandle_ = zookeeper_init(servers_z_.ptr(),
                               &io_zhandle_t::global_watcher,
                               kRecvTimeout,
@@ -176,11 +180,11 @@ void io_zhandle_t::global_watcher(zhandle_t*,
                                   void* ctx)
 {
     io_zhandle_t* iozh = reinterpret_cast<io_zhandle_t*>(ctx);
-    log_info("io_zhandle(%p): (%s, %s) at '%s'",
-             iozh,
-             event_string(type),
-             state_string(state),
-             path);
+    log_debug("io_zhandle(%p): (%s, %s) at '%s'",
+              iozh,
+              event_string(type),
+              state_string(state),
+              path);
 
     struct path_guard_t {
         path_guard_t(const char* path) : path_(path) {}
@@ -195,7 +199,7 @@ void io_zhandle_t::global_watcher(zhandle_t*,
             assert(!iozh->connected_);
             iozh->connected_ = true;
             iozh->connected_cond_.send(true);
-            log_info("zhandle(%p): connected.", iozh);
+            log_debug("zhandle(%p): connected.", iozh);
             if(iozh->fresh_session_) {
                 iozh->new_session_notify();
                 iozh->fresh_session_ = false;
@@ -203,11 +207,11 @@ void io_zhandle_t::global_watcher(zhandle_t*,
         } else if(state == ZOO_CONNECTING_STATE) {
             bq_cond_guard_t guard(iozh->connected_cond_);
             assert(iozh->connected_);
-            log_info("zhandle(%p): disconnected.", iozh);
+            log_debug("zhandle(%p): disconnected.", iozh);
             iozh->connected_ = false;
         } else if(state == ZOO_EXPIRED_SESSION_STATE) {
             bq_cond_guard_t guard(iozh->connected_cond_);
-            log_info("zhandle(%p): session expired.", iozh);
+            log_debug("zhandle(%p): session expired.", iozh);
             iozh->do_shutdown();
             iozh->do_connect();
         } else {
@@ -219,6 +223,7 @@ void io_zhandle_t::global_watcher(zhandle_t*,
                   event_string(type),
                   state_string(state),
                   path);
+        fatal("Unhandled zookeeper event at global watcher");
     }
 }
 

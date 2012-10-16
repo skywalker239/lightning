@@ -1,3 +1,5 @@
+#pragma once
+
 #include <phantom/io_zclient/io_zclient.H>
 
 #include <unordered_map>
@@ -21,18 +23,16 @@ public:
 
     struct stat_t {
         bool valid;
-        bool exists;
         string_t value;
         struct Stat stat;
 
         stat_t()
-            : valid(false), exists(false), ref_count(0)
+            : valid(false), ref_count(0)
         {}
         
         //! HACK for map::insert to work
         stat_t(const stat_t& rhs)
             : valid(rhs.valid),
-              exists(rhs.exists),
               value(rhs.value),
               stat(rhs.stat),
               ref_count(rhs.ref_count)
@@ -48,8 +48,14 @@ public:
     stat_t* add_var_ref(const string_t& key);
     void remove_var_ref(const string_t& key);
 
-    void set(const string_t& key, const string_t& value);
+    //! If version is -1, overwrites unconditionally.
+    //  Returns true on success.
+    bool set(const string_t& key, const string_t& value, int version);
 private:
+    void new_session();
+
+    string_t full_path(const string_t& key) const;
+
     //! Callback for node creation/deletion/modification watches.
     static void node_watcher(zhandle_t* zh,
                              int type,
@@ -63,15 +69,16 @@ private:
                               const struct Stat* stat,
                               const void* data);
 
+    static void stat_callback(int rc,
+                              const struct Stat* stat,
+                              const void* data);
+
     void update_node(const string_t& key,
                      const char* value,
                      int vallen,
                      const struct Stat* stat);
-    void set_no_node(const string_t& key);
 
-    static void stat_callback(int rc,
-                              const struct Stat* stat,
-                              const void* data);
+    void set_no_node(const string_t& key);
 
     static void set_callback(int rc,
                              const struct Stat* stat,
@@ -98,14 +105,15 @@ private:
     var_map_t var_map_;
     thr::spinlock_t var_map_lock_;
 
-    class __hidden watch_item_t;
+    const string_t path_;
+
     class __hidden get_item_t;
     class __hidden set_item_t;
+    class __hidden watch_item_t;
 
     class __hidden callback_data_t;
     class __hidden set_data_t;
     
-    friend class watch_item_t;
     friend class get_item_t;
     friend class set_item_t;
 };

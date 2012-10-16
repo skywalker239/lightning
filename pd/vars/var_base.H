@@ -1,6 +1,6 @@
 #pragma once
 
-#include <phantom/io_zookeeper/io_zookeeper.H>
+#include <phantom/io_zconf/io_zconf.H>
 
 #include <pd/base/string.H>
 
@@ -10,21 +10,17 @@ namespace pd {
 
 class var_base_t {
 public:
-    var_base_t(const string_t& key, phantom::io_zookeeper_t* io_zookeeper);
+    var_base_t(const string_t& key, phantom::io_zconf_t* io_zconf);
 
     ~var_base_t();
 
-    static const int kDeletedVersion = -1;
-    static const int kAnyVersion = -2;
-    static const int kInvalidVersion = -3;
+    //! Used to override version check on set().
+    static const int kAnyVersion = -1;
 
-    //! Update the local copy from io_zookeeper.
+    //! Update the local copy from io_zconf.
     //  Returns the current version of the variable.
-    //  If the variable has not yet been fetched by io_zookeeper,
+    //  If the variable has not yet been fetched by io_zconf,
     //  blocks until it becomes available.
-    //
-    //  Version kDeletedVersion means that the corresponding key
-    //  has been deleted from Zookeeper.
     int update();
 
     //! Blocks until the version of the variable becomes different from
@@ -33,9 +29,8 @@ public:
 
     //! Resets the variable to a new value. Blocks until ZK call completes.
     //  Does not reset the local copy (i.e. call set() and then update).
-    void set(const string_t& value);
-
-    bool exists() const;
+    //  
+    bool set(const string_t& value, int version);
 
     int version() const;
 
@@ -57,8 +52,8 @@ private:
 
     string_t key_;
 
-    phantom::io_zookeeper_t* io_zookeeper_;
-    phantom::io_zookeeper_t::stat_t* stat_;
+    phantom::io_zconf_t* io_zconf_;
+    phantom::io_zconf_t::stat_t* stat_;
 };
 
 }  // namespace pd

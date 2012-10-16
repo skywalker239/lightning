@@ -30,7 +30,7 @@ public:
     };
 
     io_zhandle_t(const string_t& name, const config_t& config);
-    ~io_zhandle_t() throw() {}
+    ~io_zhandle_t() throw();
 
     void lock();
 

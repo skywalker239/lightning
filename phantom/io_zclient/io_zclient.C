@@ -25,21 +25,25 @@ io_zclient_t::io_zclient_t(const string_t& name, const config_t& config)
       todo_last_(&todo_list_)
 {}
 
-void io_zclient_t::init() {
-    zhandle_.register_client(this);
-}
-
-void io_zclient_t::fini() {
-    zhandle_.deregister_client(this);
+io_zclient_t::~io_zclient_t() {
     bq_cond_guard_t guard(todo_cond_);
     while(todo_list_) {
         delete todo_list_;
     }
 }
 
+void io_zclient_t::init() {
+    zhandle_.register_client(this);
+}
+
+void io_zclient_t::fini() {
+    zhandle_.deregister_client(this);
+}
+
 void io_zclient_t::run() {
     while(true) {
         bq_cond_guard_t guard(todo_cond_);
+        log_debug("io_zclient(%p) waiting on todo_cond", this);
         
         if(!todo_list_) {
             if(!bq_success(todo_cond_.wait(NULL))) {
@@ -50,6 +54,7 @@ void io_zclient_t::run() {
         todo_item_t* todo = todo_list_;
         todo->detach();
         guard.relax();
+        log_debug("io_zclient(%p) released todo_cond, got todo %p", this, todo);
 
         todo->apply();
         delete todo;
@@ -76,7 +81,6 @@ io_zclient_t::todo_item_t::~todo_item_t() {
 
 void io_zclient_t::todo_item_t::detach() {
     assert(zclient_);
-    bq_cond_guard_t guard(zclient_->todo_cond_);
     if((*me_ = next_)) {
         next_->me_ = me_;
     }

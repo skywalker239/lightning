@@ -3,7 +3,7 @@ default: all
 include /usr/share/phantom/library.mk
 
 #$(eval $(call LIBRARY,paxos))
-#$(eval $(call LIBRARY,vars))
+$(eval $(call LIBRARY,vars))
 
 include /usr/share/phantom/module.mk
 
@@ -17,7 +17,9 @@ include /usr/share/phantom/module.mk
 #$(eval $(call MODULE,io_toy_zk_client,,vars))
 $(eval $(call MODULE,io_zclient,,,))
 $(eval $(call MODULE,io_zhandle,,,zookeeper_mt))
-$(eval $(call MODULE,io_zconf,,,))
+$(eval $(call MODULE,io_zconf,,vars,))
+$(eval $(call MODULE,io_zmaster,,vars,))
+$(eval $(call MODULE,io_zmaster_test,,,))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude -I /home/skywalker/czk/include/c-client-src
 

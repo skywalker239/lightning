@@ -111,59 +111,23 @@ struct io_zconf_t::callback_data_t {
 
 struct io_zconf_t::set_data_t {
     io_zconf_t* iozc;
+    string_t key;
     string_t value;
+    int version;
     bq_cond_t cond;
 
-    set_data_t(io_zconf_t* _iozc, const string_t& _value)
+    bool success;
+
+    set_data_t(io_zconf_t* _iozc,
+               const string_t& _key,
+               const string_t& _value,
+               int _version)
         : iozc(_iozc),
-          value(_value)
+          key(_key),
+          value(_value),
+          version(_version),
+          success(false)
     {}
-};
-
-class io_zconf_t::watch_item_t : public io_zclient_t::todo_item_t {
-public:
-    watch_item_t(io_zconf_t* zconf,
-                 const string_t& key)
-        : todo_item_t(zconf),
-          zconf_(*zconf),
-          key_(key)
-    {}
-
-    virtual void apply() {
-        MKCSTR(key_z, key_);
-        const auto& var_map = zconf_.var_map_;
-        thr::spinlock_guard_t guard(zconf_.var_map_lock_);
-        if(var_map.find(key_) == var_map.end()) {
-            log_info("key '%s' removed, not watching", key_z);
-            return;
-        }
-        guard.relax();
-
-        zhandle_guard_t zguard(zconf_.zhandle_);
-
-        zhandle_t* zhandle = zconf_.zhandle_.wait();
-        int rc = zoo_awexists(zhandle,
-                              key_z,
-                              &io_zconf_t::node_watcher,
-                              (void*) &zconf_,
-                              &io_zconf_t::stat_callback,
-                              (void*) new callback_data_t(&zconf_, key_));
-        zguard.relax();
-
-        if(rc == ZOK) {
-            return;
-        } else if(rc == ZINVALIDSTATE) {
-            new watch_item_t(&zconf_, key_);
-        } else {
-            throw exception_sys_t(log::error,
-                                  errno,
-                                  "zoo_awexists returned %d (%m)",
-                                  rc);
-        }
-    }
-private:
-    io_zconf_t& zconf_;
-    string_t key_;
 };
 
 class io_zconf_t::get_item_t : public io_zclient_t::todo_item_t {
@@ -177,10 +141,11 @@ public:
 
     virtual void apply() {
         MKCSTR(key_z, key_);
+        log_debug("get_item_t::apply (%s)", key_z);
         const auto& var_map = zconf_.var_map_;
         thr::spinlock_guard_t guard(zconf_.var_map_lock_);
         if(var_map.find(key_) == var_map.end()) {
-            log_info("key '%s' removed, not getting", key_z);
+            log_debug("key '%s' removed, not getting", key_z);
             return;
         }
         guard.relax();
@@ -201,10 +166,53 @@ public:
         } else if(rc == ZINVALIDSTATE) {
             new get_item_t(&zconf_, key_);
         } else {
-            throw exception_sys_t(log::error,
-                                  errno,
-                                  "zoo_awget returned %d (%m)",
-                                  rc);
+            log_error("zoo_awget returned %d (%m)", rc);
+            fatal("unknown state in get_item_t");
+        }
+    }
+private:
+    io_zconf_t& zconf_;
+    string_t key_;
+};
+
+class io_zconf_t::watch_item_t : public io_zclient_t::todo_item_t {
+public:
+    watch_item_t(io_zconf_t* zconf,
+                 const string_t& key)
+        : todo_item_t(zconf),
+          zconf_(*zconf),
+          key_(key)
+    {}
+
+    virtual void apply() {
+        MKCSTR(key_z, key_);
+        log_debug("watch_item_t::apply (%s)", key_z);
+        const auto& var_map = zconf_.var_map_;
+        thr::spinlock_guard_t guard(zconf_.var_map_lock_);
+        if(var_map.find(key_) == var_map.end()) {
+            log_debug("key '%s' removed, not getting", key_z);
+            return;
+        }
+        guard.relax();
+
+        zhandle_guard_t zguard(zconf_.zhandle_);
+
+        zhandle_t* zhandle = zconf_.zhandle_.wait();
+        int rc = zoo_awexists(zhandle,
+                              key_z,
+                              &io_zconf_t::node_watcher,
+                              (void*) &zconf_,
+                              &io_zconf_t::stat_callback,
+                              (void*) new callback_data_t(&zconf_, key_));
+        zguard.relax();
+
+        if(rc == ZOK) {
+            return;
+        } else if(rc == ZINVALIDSTATE) {
+            new watch_item_t(&zconf_, key_);
+        } else {
+            log_error("zoo_awexists returned %d (%m)", rc);
+            fatal("unknown state in watch_item_t");
         }
     }
 private:
@@ -215,22 +223,23 @@ private:
 class io_zconf_t::set_item_t : public io_zclient_t::todo_item_t {
 public:
     set_item_t(io_zconf_t* zconf,
-               const string_t& key,
-               const string_t& value,
                set_data_t& set_data)
         : todo_item_t(zconf),
           zconf_(*zconf),
-          key_(key),
-          value_(value),
           set_data_(set_data)
     {}
 
     virtual void apply() {
-        MKCSTR(key_z, key_);
+        MKCSTR(key_z, set_data_.key);
+        MKCSTR(value_z, set_data_.value);
+        log_debug("set_item_t::apply (%s, %s, %d)",
+                 key_z,
+                 value_z,
+                 set_data_.version);
         const auto& var_map = zconf_.var_map_;
         thr::spinlock_guard_t guard(zconf_.var_map_lock_);
-        if(var_map.find(key_) == var_map.end()) {
-            log_info("key '%s' removed, not setting", key_z);
+        if(var_map.find(set_data_.key) == var_map.end()) {
+            log_debug("key '%s' removed, not setting", key_z);
             bq_cond_guard_t set_guard(set_data_.cond);
             set_data_.cond.send(); // XXX ignoring nonwatched sets
             return;
@@ -239,12 +248,13 @@ public:
 
         zhandle_guard_t zguard(zconf_.zhandle_);
 
+        log_debug("calling zoo_aset(%s, %d)", key_z, set_data_.version);
         zhandle_t* zhandle = zconf_.zhandle_.wait();
         int rc = zoo_aset(zhandle,
                           key_z,
-                          value_.ptr(),
-                          value_.size(),
-                          -1,
+                          set_data_.value.ptr(),
+                          set_data_.value.size(),
+                          set_data_.version,
                           &io_zconf_t::set_callback,
                           (void*) &set_data_);
         zguard.relax();
@@ -252,59 +262,62 @@ public:
         if(rc == ZOK) {
             return;
         } else if(rc == ZINVALIDSTATE) {
-            new set_item_t(&zconf_, key_, value_, set_data_);
+            new set_item_t(&zconf_, set_data_);
         } else {
-            throw exception_sys_t(log::error,
-                                  errno,
-                                  "zoo_aset returned %d (%m)",
-                                  rc);
+            log_error("zoo_aset returned %d (%m)", rc);
+            fatal("unknown state in zoo_aset");
         }
     }
 private:
     io_zconf_t& zconf_;
     string_t key_;
     string_t value_;
+    int version_;
     set_data_t& set_data_;
 };
 
 
 void io_zconf_t::config_t::check(const in_t::ptr_t& p) const {
     io_zclient_t::config_t::check(p);
-    if(path.size() == 0) {
-        config::error(p, "path must be set");
-    }
 }
 
 io_zconf_t::io_zconf_t(const string_t& name, const config_t& config)
-    : io_zclient_t(name, config)
+    : io_zclient_t(name, config),
+      path_(config.path)
 {}
 
 io_zconf_t::~io_zconf_t()
 {}
 
+string_t io_zconf_t::full_path(const string_t& key) const {
+    return string_t::ctor_t(key.size() + path_.size() + 1)(path_)('/')(key);
+}
+
 io_zconf_t::stat_t* io_zconf_t::add_var_ref(const string_t& key) {
+    const string_t full_key = full_path(key);
     thr::spinlock_guard_t map_guard(var_map_lock_);
-    auto iter = var_map_.insert(std::make_pair(key, stat_t()));
+    auto iter = var_map_.insert(std::make_pair(full_key, stat_t()));
     stat_t& var_stat = iter.first->second;
-
-    if(iter.second) {
-        new watch_item_t(this, key);
-    }
-
     bq_cond_guard_t ref_guard(var_stat.cond);
     int rc = ++var_stat.ref_count;
     ref_guard.relax();
+
+    if(iter.second) {
+        new watch_item_t(this, full_key);
+    }
+
     map_guard.relax();
 
-    MKCSTR(key_z, key);
-    log_info("Added key '%s', refcount is %d", key_z, rc);
+    MKCSTR(key_z, full_key);
+    log_debug("Added key '%s', refcount is %d", key_z, rc);
 
     return &var_stat;
 }
 
 void io_zconf_t::remove_var_ref(const string_t& key) {
+    const string_t full_key = full_path(key);
     thr::spinlock_guard_t map_guard(var_map_lock_);
-    auto iter = var_map_.find(key);
+    auto iter = var_map_.find(full_key);
 
     assert(iter != var_map_.end());
     stat_t& var_stat = iter->second;
@@ -312,23 +325,24 @@ void io_zconf_t::remove_var_ref(const string_t& key) {
     int rc = --var_stat.ref_count;
     ref_guard.relax();
     if(rc == 0) {
-        var_map_.erase(key);
+        var_map_.erase(full_key);
     }
     map_guard.relax();
 
-    MKCSTR(key_z, key);
-    log_info("Removed key '%s', refcount is now %d", key_z, rc);
+    MKCSTR(key_z, full_key);
+    log_debug("Removed key '%s', refcount is now %d", key_z, rc);
 }
 
-void io_zconf_t::set(const string_t& key, const string_t& value) {
-    set_data_t set_data(this, value);
+bool io_zconf_t::set(const string_t& key, const string_t& value, int version) {
+    set_data_t set_data(this, full_path(key), value, version);
 
     bq_cond_guard_t set_guard(set_data.cond);
-    new set_item_t(this, key, value, set_data);
+    new set_item_t(this, set_data);
 
     if(!bq_success(set_data.cond.wait(NULL))) {
         throw exception_sys_t(log::error, errno, "set_data.cond.wait: %m");
     }
+    return set_data.success;
 }
 
 void io_zconf_t::node_watcher(zhandle_t*,
@@ -340,7 +354,7 @@ void io_zconf_t::node_watcher(zhandle_t*,
     io_zconf_t* iozc = reinterpret_cast<io_zconf_t*>(ctx);
 
     free_guard_t<const char> path_guard(path);
-    log_info("node watch: state %s, event %s at '%s'",
+    log_debug("node watch: state %s, event %s at '%s'",
              state_string(state),
              event_string(type),
              path);
@@ -348,16 +362,17 @@ void io_zconf_t::node_watcher(zhandle_t*,
     string_t key = string_t::ctor_t(path_len)(str_t(path, path_len));
 
     if(type == ZOO_SESSION_EVENT) {
-        log_info("node watch for '%s' doing nothing for ZOO_SESSION_EVENT",
-                 path);
-    } else if(type == ZOO_CREATED_EVENT || type == ZOO_CHANGED_EVENT) {
+        log_debug("node watch for '%s' doing nothing for ZOO_SESSION_EVENT",
+                  path);
+    } else if(type == ZOO_CREATED_EVENT) {
         new get_item_t(iozc, key);
     } else if(type == ZOO_DELETED_EVENT) {
         new watch_item_t(iozc, key);
+    } else if(type == ZOO_CHANGED_EVENT) {
+        new get_item_t(iozc, key);
     } else {
-        throw exception_log_t(log::error,
-                              "Unknown event %d at node_watcher",
-                              type);
+        log_error("Unknown event %d at node_watcher", type);
+        fatal("unknown state in node_watcher");
     }
 }
 
@@ -377,36 +392,11 @@ void io_zconf_t::data_callback(int rc,
 
     if(rc == ZOK) {
         iozc->update_node(path, value, vallen, stat);
-    } else if(rc == ZNONODE) {
-        iozc->set_no_node(path);
-        new watch_item_t(iozc, path);
-    } else {
-        throw exception_log_t(log::error,
-                              "data_callback got rc %d",
-                              rc);
-    }
-}
-
-void io_zconf_t::stat_callback(int rc,
-                               const struct Stat* stat,
-                               const void* data)
-{
-    callback_data_t* callback_data = (callback_data_t*) data;
-
-    delete_guard_t<callback_data_t> cbdata_guard(callback_data);
-    Stat_guard_t stat_guard(stat);
-
-    io_zconf_t* iozc = callback_data->iozc;
-    const string_t& path = callback_data->path;
-
-    if(rc == ZOK) {
+    } else if(rc == ZOPERATIONTIMEOUT) {
         new get_item_t(iozc, path);
-    } else if(rc == ZNONODE) {
-        iozc->set_no_node(path);
     } else {
-        throw exception_log_t(log::error,
-                              "stat_callback got rc %d",
-                              rc);
+        log_error("data_callback got rc %d", rc);
+        fatal("unknown state in data_callback");
     }
 }
 
@@ -420,11 +410,44 @@ void io_zconf_t::set_callback(int rc,
 
     if(rc == ZOK) {
         bq_cond_guard_t set_guard(set_data->cond);
+        set_data->success = true;
+        set_data->iozc->update_node(set_data->key,
+                                    set_data->value.ptr(),
+                                    set_data->value.size(),
+                                    stat);
         set_data->cond.send();
+    } else if(rc == ZBADVERSION) {
+        bq_cond_guard_t set_guard(set_data->cond);
+        set_data->success = false;
+        set_data->cond.send();
+    } else if(rc == ZOPERATIONTIMEOUT) {
+        new set_item_t(set_data->iozc, *set_data);
     } else {
-        throw exception_log_t(log::error,
-                              "set_callback got rc %d",
-                              rc);
+        log_error("set_callback got rc %d", rc);
+        fatal("unknown state in set_callback");
+    }
+}
+
+void io_zconf_t::stat_callback(int rc,
+                               const struct Stat* stat,
+                               const void* data)
+{
+    callback_data_t* callback_data = (callback_data_t*) data;
+    delete_guard_t<callback_data_t> cbdata_guard(callback_data);
+    Stat_guard_t stat_guard(stat);
+
+    io_zconf_t* iozc = callback_data->iozc;
+    const string_t& path = callback_data->path;
+
+    if(rc == ZOK) {
+        new get_item_t(iozc, path);
+    } else if(rc == ZNONODE) {
+        iozc->set_no_node(path);
+    } else if(rc == ZOPERATIONTIMEOUT) {
+        new watch_item_t(iozc, path);
+    } else {
+        log_error("stat_callback got rc %d", rc);
+        fatal("unknown state in stat_callback");
     }
 }
 
@@ -437,7 +460,7 @@ void io_zconf_t::update_node(const string_t& key,
     thr::spinlock_guard_t map_guard(var_map_lock_);
     auto iter = var_map_.find(key);
     if(iter == var_map_.end()) {
-        log_info("update_node: key '%s' not found", key_z);
+        log_debug("update_node: key '%s' not found", key_z);
         return;
     }
     stat_t& var_stat = iter->second;
@@ -446,7 +469,6 @@ void io_zconf_t::update_node(const string_t& key,
     map_guard.relax();
 
     var_stat.valid = true;
-    var_stat.exists = true;
     var_stat.value = string_t::ctor_t(vallen)(str_t(value, vallen));
     var_stat.stat = *stat;
 
@@ -457,12 +479,13 @@ void io_zconf_t::update_node(const string_t& key,
     log_info("update_node '%s' = '%s' (czxid=%ld mzxid=%ld ctime=%ld mtime=%ld version=%d cversion=%d aversion=%d ephemeralOwner=%ld dataLength=%d numChildren=%d pzxid=%ld)", key_z, val_z, stat->czxid, stat->mzxid, stat->ctime, stat->mtime, stat->version, stat->cversion, stat->aversion, stat->ephemeralOwner, stat->dataLength, stat->numChildren, stat->pzxid);
 }
 
-void io_zconf_t::set_no_node(const string_t& key) {
+void io_zconf_t::set_no_node(const string_t& key)
+{
     MKCSTR(key_z, key);
     thr::spinlock_guard_t map_guard(var_map_lock_);
     auto iter = var_map_.find(key);
     if(iter == var_map_.end()) {
-        log_info("set_no_node: key '%s' not found", key_z);
+        log_debug("update_node: key '%s' not found", key_z);
         return;
     }
     stat_t& var_stat = iter->second;
@@ -470,21 +493,31 @@ void io_zconf_t::set_no_node(const string_t& key) {
     bq_cond_guard_t var_guard(var_stat.cond);
     map_guard.relax();
 
-    var_stat.valid = true;
-    var_stat.exists = false;
+    var_stat.valid = false;
     var_stat.value = string_t::empty;
 
-    var_stat.cond.send(true);
     var_guard.relax();
 
+    MKCSTR(val_z, var_stat.value);
     log_info("set_no_node '%s'", key_z);
+}
+
+void io_zconf_t::new_session() {
+    log_info("new session, reregistering watches");
+    
+    thr::spinlock_guard_t guard(var_map_lock_);
+    for(auto i = var_map_.begin(); i != var_map_.end(); ++i) {
+        MKCSTR(key_z, i->first);
+        log_debug("adding watch for %s", key_z);
+        new watch_item_t(this, i->first);
+    }
 }
 
 namespace io_zconf {
 config_binding_sname(io_zconf_t);
 config_binding_value(io_zconf_t, path);
 config_binding_parent(io_zconf_t, io_zclient_t, 1);
-config_binding_ctor(io_t, io_zhandle_t);
+config_binding_ctor(io_t, io_zconf_t);
 }  // namespace io_zconf
 
 }  // namespace phantom
