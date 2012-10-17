@@ -108,6 +108,35 @@ void io_zmaster_t::advance_epoch() {
     state_cond_.send(true);
 }
 
+class io_zmaster_t::activate_item_t : public io_zclient_t::todo_item_t {
+public:
+    activate_item_t(io_zmaster_t* zmaster, int epoch)
+        : todo_item_t(zmaster),
+          zmaster_(*zmaster),
+          epoch_(epoch)
+    {
+        log_debug("activate_item_t ctor(%p)", this);
+    }
+
+    virtual void apply() {
+        bq_cond_guard_t guard(zmaster_.state_cond_);
+
+        if(zmaster_.current_epoch_ == epoch_ ||
+           (zmaster_.current_epoch_ == epoch_ + 1 && zmaster_.state_ == io_zmaster_t::INACTIVE))
+        {
+            zmaster_.do_activate();
+        } else {
+            log_info("activate_item_t(%d): current epoch is %d and state %d, not activating",
+                     epoch_,
+                     zmaster_.current_epoch_,
+                     zmaster_.state_);
+        }
+    }
+private:
+    io_zmaster_t& zmaster_;
+    int epoch_;
+};
+
 class io_zmaster_t::delete_item_t : public io_zclient_t::todo_item_t {
 public:
     delete_item_t(io_zmaster_t* zmaster, int epoch)
@@ -682,7 +711,12 @@ void io_zmaster_t::new_session() {
     //  Otherwise we need to activate.
     if(state_ != INACTIVE && state_ != CANCELING) {
         do_deactivate();
-        do_activate();
+        //! We cannot call do_activate() here directly
+        //  because new_session is called from a
+        //  non-bq thread and do_activate waits on a
+        //  bq condition variable. So we schedule
+        //  an activation.
+        new activate_item_t(this, current_epoch_);
     }
 }
 

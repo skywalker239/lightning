@@ -85,6 +85,7 @@ private:
     int predecessor_index(const string_t& key,
                           const struct String_vector* keys) const;
 
+    class __hidden activate_item_t;
     class __hidden callback_data_t;
     class __hidden create_item_t;
     class __hidden delete_item_t;
@@ -115,6 +116,7 @@ private:
     string_t seq_node_path_;
     bq_cond_t state_cond_;
 
+    friend class activate_item_t;
     friend class create_item_t;
     friend class get_children_item_t;
     friend class delete_item_t;
