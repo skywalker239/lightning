@@ -1,4 +1,5 @@
 #include <phantom/io_zmaster/io_zmaster.H>
+#include <phantom/io_zhandle/zoo_util.H>
 
 #include <pd/base/exception.H>
 #include <pd/base/log.H>
@@ -10,20 +11,6 @@ namespace phantom {
 MODULE(io_zmaster);
 
 namespace {
-
-template<typename T>
-class free_guard_t {
-public:
-    free_guard_t(T* ptr)
-        : ptr_(ptr)
-    {}
-
-    ~free_guard_t() {
-        free((void*)ptr_);
-    }
-private:
-    T* ptr_;
-};
 
 template<typename T>
 class delete_guard_t {
@@ -38,66 +25,6 @@ public:
 private:
     T* ptr_;
 };
-
-class Stat_guard_t {
-public:
-    Stat_guard_t(const struct Stat* stat)
-        : stat_(stat)
-    {}
-
-    ~Stat_guard_t() {
-        deallocate_Stat((Stat*) stat_);
-    }
-private:
-    const struct Stat* stat_;
-};
-
-class String_vector_guard_t {
-public:
-    String_vector_guard_t(const struct String_vector* sv)
-        : sv_(sv)
-    {}
-
-    ~String_vector_guard_t() {
-        deallocate_String_vector((String_vector*) sv_);
-    }
-private:
-    const struct String_vector* sv_;
-};
-
-const char* state_string(int state) {
-    if(state == ZOO_EXPIRED_SESSION_STATE) {
-            return "ZOO_EXPIRED_SESSION_STATE";
-    } else if(state == ZOO_AUTH_FAILED_STATE) {
-            return "ZOO_AUTH_FAILED_STATE";
-    } else if(state == ZOO_CONNECTING_STATE) {
-            return "ZOO_CONNECTING_STATE";
-    } else if(state == ZOO_ASSOCIATING_STATE) {
-            return "ZOO_ASSOCIATING_STATE";
-    } else if(state == ZOO_CONNECTED_STATE) {
-            return "ZOO_CONNECTED_STATE";
-    } else {
-            return "ZOO_UNKNOWN_STATE";
-    }
-}
-
-const char* event_string(int type) {
-    if(type == ZOO_CREATED_EVENT) {
-            return "ZOO_CREATED_EVENT";
-    } else if(type == ZOO_DELETED_EVENT) {
-            return "ZOO_DELETED_EVENT";
-    } else if(type == ZOO_CHANGED_EVENT) {
-            return "ZOO_CHANGED_EVENT";
-    } else if(type == ZOO_CHILD_EVENT) {
-            return "ZOO_CHILD_EVENT";
-    } else if(type == ZOO_SESSION_EVENT) {
-            return "ZOO_SESSION_EVENT";
-    } else if(type == ZOO_NOTWATCHING_EVENT) {
-            return "ZOO_NOTWATCHING_EVENT";
-    } else {
-            return "ZOO_UNKNOWN_EVENT";
-    }
-}
 
 }  // anonymous namespace
 
@@ -187,15 +114,17 @@ public:
         : todo_item_t(zmaster),
           zmaster_(*zmaster),
           epoch_(epoch)
-    {}
+    {
+        log_debug("delete_item_t ctor(%p)", this);
+    }
 
     virtual void apply() {
-        log_debug("delete_item_t::apply %d", epoch_);
-
         zhandle_guard_t zguard(zmaster_.zhandle_);
         zhandle_t* zhandle = zmaster_.zhandle_.wait();
 
         bq_cond_guard_t guard(zmaster_.state_cond_);
+        log_debug("delete_item_t::apply %d", epoch_);
+
         if(zmaster_.current_epoch_ != epoch_) {
             log_info("delete_item_t: epoch mismatch (%d, %d)",
                      zmaster_.current_epoch_,
@@ -215,11 +144,11 @@ public:
                      epoch_);
             return;
         } else if(rc == ZINVALIDSTATE) {
-            log_debug("delete_item_t: zhandle is in ZINVALIDSTATE, nothing to do");
-            zmaster_.advance_epoch();
+            log_debug("delete_item_t: zhandle is in ZINVALIDSTATE, retrying");
+            new delete_item_t(&zmaster_, epoch_);
             return;
         } else {
-            log_error("zoo_adelete returned %d (%m)", rc);
+            log_error("zoo_adelete returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in delete_item_t");
         }
     }
@@ -244,15 +173,17 @@ void io_zmaster_t::delete_callback(int rc, const void* data) {
     }
     assert(zmaster.state_ == CANCELING);
 
-    if(rc == ZOK) {
-        log_debug("delete_callback: success");
+    if(rc == ZOK || rc == ZNONODE) {
+        log_debug("delete_callback(%s): success", zerror(rc));
         zmaster.advance_epoch();
-    } else if(rc == ZOPERATIONTIMEOUT) {
+    } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         log_debug("delete_callback: timed out, retrying");
         guard.relax();
         new delete_item_t(&zmaster, epoch);
+    } else if(rc == ZCLOSING) {
+        log_debug("delete_callback: ZK closing");
     } else {
-        log_error("delete_callback: unknown rc %d", rc);
+        log_error("delete_callback: unknown rc %d (%s)", rc, zerror(rc));
         fatal("unknown state in delete_callback");
     }
 }
@@ -263,11 +194,11 @@ public:
         : todo_item_t(zmaster),
           zmaster_(*zmaster),
           epoch_(epoch)
-    {}
+    {
+        log_debug("create_item_t ctor(%p)", this);
+    }
 
     virtual void apply() {
-        log_debug("create_item_t::apply %d", epoch_);
-
         const string_t path = zmaster_.seq_node_path_base();
         const string_t value = zmaster_.seq_node_value();
 
@@ -275,6 +206,8 @@ public:
         zhandle_t* zhandle = zmaster_.zhandle_.wait();
 
         bq_cond_guard_t guard(zmaster_.state_cond_);
+        log_debug("create_item_t::apply %d", epoch_);
+
         if(zmaster_.current_epoch_ != epoch_) {
             log_info("create_item_t: epoch mismatch (%d, %d)",
                      zmaster_.current_epoch_,
@@ -301,10 +234,11 @@ public:
             log_info("zmaster: ACTIVATING(%d) -> REGISTERING(%d)", epoch_, epoch_);
             return;
         } else if(rc == ZINVALIDSTATE) {
-            log_debug("create_item_t: zhandle is in ZINVALIDSTATE, doing nothing");
+            log_debug("create_item_t: zhandle is in ZINVALIDSTATE, retrying");
+            new create_item_t(&zmaster_, epoch_);
             return;
         } else {
-            log_error("zoo_acreate returned %d (%m)", rc);
+            log_error("zoo_acreate returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in create_item_t");
         }
     }
@@ -319,15 +253,17 @@ public:
         : todo_item_t(zmaster),
           zmaster_(*zmaster),
           epoch_(epoch)
-    {}
+    {
+        log_debug("get_children_item_t ctor(%p)", this);
+    }
 
     void apply() {
-        log_debug("get_children_item_t::apply %d", epoch_);
-
         zhandle_guard_t zguard(zmaster_.zhandle_);
         zhandle_t* zhandle = zmaster_.zhandle_.wait();
 
         bq_cond_guard_t guard(zmaster_.state_cond_);
+        log_debug("get_children_item_t::apply %d", epoch_);
+
         if(zmaster_.current_epoch_ != epoch_) {
             log_info("get_children_item_t: epoch mismatch (%d, %d)",
                      zmaster_.current_epoch_,
@@ -356,9 +292,10 @@ public:
             zmaster_.state_ = io_zmaster_t::GETTING_CHILDREN;
             return;
         } else if(rc == ZINVALIDSTATE) {
-            log_debug("io_zmaster_t::get_children_item_t: zhandle is in ZINVALIDSTATE, doing nothing");
+            log_debug("io_zmaster_t::get_children_item_t: zhandle is in ZINVALIDSTATE, retrying");
+            new get_children_item_t(&zmaster_, epoch_);
         } else {
-            log_error("zoo_aget_children returned %d (%m)", rc);
+            log_error("zoo_aget_children returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in zoo_aget_children");
         }
     }
@@ -373,16 +310,18 @@ public:
         : todo_item_t(zmaster),
           zmaster_(*zmaster),
           epoch_(epoch),
-          key_z_(string_t::ctor_t(key.size() + 1)(key)('\0'))
-    {}
+          key_(key)
+    {
+        log_debug("watch_item_t ctor(%p)", this);
+    }
 
     virtual void apply() {
-        log_debug("watch_item_t::apply %d", epoch_);
-
         zhandle_guard_t zguard(zmaster_.zhandle_);
         zhandle_t* zhandle = zmaster_.zhandle_.wait();
 
         bq_cond_guard_t guard(zmaster_.state_cond_);
+        log_debug("watch_item_t::apply %d", epoch_);
+
         if(zmaster_.current_epoch_ != epoch_) {
             log_info("watch_item_t: epoch mismatch (%d, %d)",
                      zmaster_.current_epoch_,
@@ -400,8 +339,9 @@ public:
         callback_data_t* watch_context = new callback_data_t(&zmaster_, epoch_);
         callback_data_t* watch_callback_data = new callback_data_t(&zmaster_, epoch_);
         watch_callback_data->next = watch_context;
+        MKCSTR(key_z, key_);
         int rc = zoo_awexists(zhandle,
-                              key_z_.ptr(),
+                              key_z,
                               &io_zmaster_t::deletion_watch,
                               (void*) watch_context,
                               &io_zmaster_t::watch_callback,
@@ -413,16 +353,17 @@ public:
             zmaster_.state_ = io_zmaster_t::WAITING_WATCH;
             return;
         } else if(rc == ZINVALIDSTATE) {
-            log_debug("watch_item_t: zhandle in ZINVALIDSTATE, doing nothing");
+            log_debug("watch_item_t: zhandle in ZINVALIDSTATE, retrying");
+            new watch_item_t(&zmaster_, epoch_, key_);
         } else {
-            log_error("zoo_awexists returned %d (%m)", rc);
+            log_error("zoo_awexists returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in watch_item_t");
         }
     }
 private:
     io_zmaster_t& zmaster_;
     int epoch_;
-    const string_t key_z_;
+    const string_t key_;
 };
 
 class io_zmaster_t::set_master_item_t : public io_zclient_t::todo_item_t {
@@ -431,12 +372,14 @@ public:
         : todo_item_t(zmaster),
           zmaster_(*zmaster),
           epoch_(epoch)
-    {}
+    {
+        log_debug("set_master_item_t ctor(%p)", this);
+    }
 
     virtual void apply() {
+        bq_cond_guard_t guard(zmaster_.state_cond_);
         log_debug("set_master_item_t::apply %d", epoch_);
 
-        bq_cond_guard_t guard(zmaster_.state_cond_);
         if(zmaster_.current_epoch_ != epoch_) {
             log_info("set_master_item_t: epoch mismatch (%d, %d)",
                      zmaster_.current_epoch_,
@@ -462,10 +405,11 @@ private:
 void io_zmaster_t::activate() {
     log_info("io_zmaster_t::activate()");
     bq_cond_guard_t guard(state_cond_);
-    do_activate(guard);
+    do_activate();
 }
 
-void io_zmaster_t::do_activate(bq_cond_guard_t& guard) {
+void io_zmaster_t::do_activate() {
+    log_info("io_zmaster_t::do_activate()");
     while(true) {
         if(state_ != INACTIVE) {
             log_info("io_zmaster_t::activate waiting for INACTIVE state");
@@ -480,13 +424,17 @@ void io_zmaster_t::do_activate(bq_cond_guard_t& guard) {
              current_epoch_,
              current_epoch_);
     state_ = ACTIVATING;
-    guard.relax();
     new create_item_t(this, current_epoch_);
 }
 
 void io_zmaster_t::deactivate() {
-    log_info("io_zmaster_t::deactivate()");
     bq_cond_guard_t guard(state_cond_);
+    log_info("io_zmaster_t::deactivate");
+    do_deactivate();
+}
+
+void io_zmaster_t::do_deactivate() {
+    log_info("io_zmaster_t::deactivate()");
 
     if(state_ != INACTIVE) {
         state_t old_state = state_;
@@ -500,7 +448,6 @@ void io_zmaster_t::deactivate() {
 void io_zmaster_t::create_callback(int rc, const char* value, const void* data) {
     callback_data_t* callback_data = (callback_data_t*) data;
     delete_guard_t<callback_data_t> cbguard(callback_data);
-    free_guard_t<const char> value_guard(value);
 
     io_zmaster_t& zmaster = *(callback_data->zmaster);
     const int epoch = callback_data->epoch;
@@ -533,7 +480,7 @@ void io_zmaster_t::create_callback(int rc, const char* value, const void* data) 
     
             new get_children_item_t(&zmaster, epoch);
         }
-    } else if(rc == ZOPERATIONTIMEOUT) {
+    } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         if(zmaster.state_ == CANCELING) {
             log_info("io_zmaster_t::create_callback(failed) canceled");
             zmaster.advance_epoch();
@@ -544,8 +491,10 @@ void io_zmaster_t::create_callback(int rc, const char* value, const void* data) 
     
             new create_item_t(&zmaster, epoch);
         }
+    } else if(rc == ZCLOSING) {
+        log_debug("create_callback: ZK closing");
     } else {
-        log_error("io_zmaster_t::create_callback got unknown rc %d", rc);
+        log_error("io_zmaster_t::create_callback got unknown rc %d (%s)", rc, zerror(rc));
         fatal("unknown state in create_callback");
     }
 }
@@ -555,7 +504,6 @@ void io_zmaster_t::children_callback(int rc,
                                      const void* data)
 {
     callback_data_t* callback_data = (callback_data_t*) data;
-    String_vector_guard_t svguard(strings);
     delete_guard_t<callback_data_t> cbguard(callback_data);
 
     io_zmaster_t& zmaster = *(callback_data->zmaster);
@@ -595,22 +543,23 @@ void io_zmaster_t::children_callback(int rc,
             guard.relax();
             new watch_item_t(&zmaster, epoch, watch_key);
         }
-    } else if(rc == ZOPERATIONTIMEOUT) {
+    } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         log_debug("children_callback: timed out, retrying");
         new get_children_item_t(&zmaster, epoch);
+    } else if(rc == ZCLOSING) {
+        log_debug("children_callback: ZK closing");
     } else {
-        log_error("children_callback: unknown rc %d", rc);
+        log_error("children_callback: unknown rc %d (%s)", rc, zerror(rc));
         fatal("unknown state in children_callback");
     }
 }
 
 
 void io_zmaster_t::watch_callback(int rc,
-                                  const struct Stat* stat,
+                                  const struct Stat* /* stat */,
                                   const void* data)
 {
     callback_data_t* callback_data = (callback_data_t*) data;
-    Stat_guard_t stat_guard(stat);
     delete_guard_t<callback_data_t> cbguard(callback_data);
 
     io_zmaster_t& zmaster = *(callback_data->zmaster);
@@ -640,16 +589,19 @@ void io_zmaster_t::watch_callback(int rc,
                  epoch,
                  epoch);
         zmaster.state_ = WATCHING;
-    } else if(rc == ZNONODE || rc == ZOPERATIONTIMEOUT) {
-        log_info("watch_callback: WAITING_WATCH(%d) -> REGISTERED(%d)",
+    } else if(rc == ZNONODE || rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
+        log_info("watch_callback(%s): WAITING_WATCH(%d) -> REGISTERED(%d)",
+                 zerror(rc),
                  epoch,
                  epoch + 1);
         ++zmaster.current_epoch_;
         guard.relax();
         zmaster.state_ = REGISTERED;
         new get_children_item_t(&zmaster, epoch + 1);
+    } else if(rc == ZCLOSING) {
+        log_debug("watch_callback: ZK closing");
     } else {
-        log_error("watch_callback: unknown rc %d", rc);
+        log_error("watch_callback: unknown rc %d (%s)", rc, zerror(rc));
         fatal("unknown state in watch_callback");
     }
 }
@@ -662,11 +614,10 @@ void io_zmaster_t::deletion_watch(zhandle_t* /* zh */,
 {
     callback_data_t* callback_data = (callback_data_t*) watcherCtx;
     delete_guard_t<callback_data_t> cbguard(callback_data);
-    free_guard_t<const char> path_guard(path);
 
     log_info("io_zmaster_t::deletion_watch (%s, %s) at '%s'",
-             event_string(type),
-             state_string(state),
+             zoo_util::event_string(type),
+             zoo_util::state_string(state),
              path);
 
     if(type == ZOO_SESSION_EVENT) {
@@ -675,7 +626,7 @@ void io_zmaster_t::deletion_watch(zhandle_t* /* zh */,
     }
     assert(state == ZOO_CONNECTED_STATE);
     if(type != ZOO_DELETED_EVENT) {
-        log_error("deletion_watch: got bad event (%s, %s)", event_string(type), state_string(state));
+        log_error("deletion_watch: got bad event (%s, %s)", zoo_util::event_string(type), zoo_util::state_string(state));
         fatal("unknown state in deletion_watch");
     }
 
@@ -725,10 +676,13 @@ void io_zmaster_t::new_session() {
     log_info("io_zmaster_t::new_session");
     bq_cond_guard_t guard(state_cond_);
 
-    if(state_ != INACTIVE) {
-        state_ = CANCELING; // asserted by advance_epoch
-        advance_epoch();
-        do_activate(guard);
+    //! In case of INACTIVE there is nothing to do.
+    //  In case of CANCELING there is something down
+    //  the queue that will complete the canceling.
+    //  Otherwise we need to activate.
+    if(state_ != INACTIVE && state_ != CANCELING) {
+        do_deactivate();
+        do_activate();
     }
 }
 

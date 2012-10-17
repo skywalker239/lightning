@@ -47,8 +47,10 @@ private:
     const string_t seq_node_value() const;
     const string_t make_full_path(const char* node_name) const;
 
-    //! The part of activate called with a held lock.
-    void do_activate(bq_cond_guard_t& guard);
+    //! The part of activate called under lock.
+    void do_activate();
+    //! The part of deactivate called under lock.
+    void do_deactivate();
 
     //! Final part of master stepdown. Resets seq_node_path,
     //  sets state to INACTIVE, increments the epoch number and

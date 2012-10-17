@@ -67,6 +67,7 @@ void io_zclient_t::stat(out_t&, bool) {
 io_zclient_t::todo_item_t::todo_item_t(io_zclient_t* zclient)
     : zclient_(zclient)
 {
+    log_debug("todo_item_t ctor(%p)", this);
     bq_cond_guard_t guard(zclient_->todo_cond_);
     *(me_ = zclient_->todo_last_) = this;
     *(zclient_->todo_last_ = &next_) = NULL;

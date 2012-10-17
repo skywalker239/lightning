@@ -328,7 +328,8 @@ void io_zconf_t::data_callback(int rc,
 
     if(rc == ZOK) {
         iozc->update_node(path, value, vallen, stat);
-    } else if(rc == ZOPERATIONTIMEOUT) {
+    } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
+        log_debug("data_callback failed (%s), retrying", zerror(rc));
         new get_item_t(iozc, path);
     } else if(rc == ZCLOSING) {
         log_debug("data_callback: ZK closing");
@@ -356,7 +357,8 @@ void io_zconf_t::set_callback(int rc,
         bq_cond_guard_t set_guard(set_data->cond);
         set_data->success = false;
         set_data->cond.send();
-    } else if(rc == ZOPERATIONTIMEOUT) {
+    } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
+        log_debug("set_callback failed (%s), retrying", zerror(rc));
         new set_item_t(set_data->iozc, *set_data);
     } else if(rc == ZCLOSING) {
         log_debug("set_callback: ZK closing");
@@ -380,7 +382,8 @@ void io_zconf_t::stat_callback(int rc,
         new get_item_t(iozc, path);
     } else if(rc == ZNONODE) {
         iozc->set_no_node(path);
-    } else if(rc == ZOPERATIONTIMEOUT) {
+    } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
+        log_debug("stat_callback failed (%s), retrying", zerror(rc));
         new watch_item_t(iozc, path);
     } else if(rc == ZCLOSING) {
         log_debug("stat_callback: ZK closing");
