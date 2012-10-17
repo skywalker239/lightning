@@ -27,7 +27,8 @@ public:
         todo_item_t(io_zclient_t* zclient);
         virtual ~todo_item_t();
 
-        void detach();
+        void attach() throw();
+        void detach() throw();
 
         virtual void apply() = 0;
     };
@@ -36,6 +37,8 @@ public:
     ~io_zclient_t() throw();
 protected:
     io_zhandle_t& zhandle_;
+
+    void schedule(todo_item_t* todo_item);
     
 private:
     virtual void init();

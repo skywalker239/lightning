@@ -102,7 +102,7 @@ public:
         if(rc == ZOK) {
             return;
         } else if(rc == ZINVALIDSTATE) {
-            new get_item_t(&zconf_, key_);
+            zconf_.schedule(new get_item_t(&zconf_, key_));
         } else {
             log_error("zoo_awget returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in get_item_t");
@@ -147,7 +147,7 @@ public:
         if(rc == ZOK) {
             return;
         } else if(rc == ZINVALIDSTATE) {
-            new watch_item_t(&zconf_, key_);
+            zconf_.schedule(new watch_item_t(&zconf_, key_));
         } else {
             log_error("zoo_awexists returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in watch_item_t");
@@ -201,7 +201,7 @@ public:
         if(rc == ZOK) {
             return;
         } else if(rc == ZINVALIDSTATE) {
-            new set_item_t(&zconf_, set_data_);
+            zconf_.schedule(new set_item_t(&zconf_, set_data_));
         } else {
             log_error("zoo_aset returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in zoo_aset");
@@ -242,7 +242,7 @@ io_zconf_t::stat_t* io_zconf_t::add_var_ref(const string_t& key) {
     ref_guard.relax();
 
     if(iter.second) {
-        new watch_item_t(this, full_key);
+        schedule(new watch_item_t(this, full_key));
     }
 
     map_guard.relax();
@@ -276,7 +276,7 @@ bool io_zconf_t::set(const string_t& key, const string_t& value, int version) {
     set_data_t set_data(this, full_path(key), value, version);
 
     bq_cond_guard_t set_guard(set_data.cond);
-    new set_item_t(this, set_data);
+    schedule(new set_item_t(this, set_data));
 
     if(!bq_success(set_data.cond.wait(NULL))) {
         throw exception_sys_t(log::error, errno, "set_data.cond.wait: %m");
@@ -303,11 +303,11 @@ void io_zconf_t::node_watcher(zhandle_t*,
         log_debug("node watch for '%s' doing nothing for ZOO_SESSION_EVENT",
                   path);
     } else if(type == ZOO_CREATED_EVENT) {
-        new get_item_t(iozc, key);
+        iozc->schedule(new get_item_t(iozc, key));
     } else if(type == ZOO_DELETED_EVENT) {
-        new watch_item_t(iozc, key);
+        iozc->schedule(new watch_item_t(iozc, key));
     } else if(type == ZOO_CHANGED_EVENT) {
-        new get_item_t(iozc, key);
+        iozc->schedule(new get_item_t(iozc, key));
     } else {
         log_error("Unknown event %d (%s) at node_watcher", type, zoo_util::event_string(type));
         fatal("unknown state in node_watcher");
@@ -330,7 +330,7 @@ void io_zconf_t::data_callback(int rc,
         iozc->update_node(path, value, vallen, stat);
     } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         log_debug("data_callback failed (%s), retrying", zerror(rc));
-        new get_item_t(iozc, path);
+        iozc->schedule(new get_item_t(iozc, path));
     } else if(rc == ZCLOSING) {
         log_debug("data_callback: ZK closing");
     } else {
@@ -359,7 +359,7 @@ void io_zconf_t::set_callback(int rc,
         set_data->cond.send();
     } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         log_debug("set_callback failed (%s), retrying", zerror(rc));
-        new set_item_t(set_data->iozc, *set_data);
+        set_data->iozc->schedule(new set_item_t(set_data->iozc, *set_data));
     } else if(rc == ZCLOSING) {
         log_debug("set_callback: ZK closing");
     } else {
@@ -379,12 +379,12 @@ void io_zconf_t::stat_callback(int rc,
     const string_t& path = callback_data->path;
 
     if(rc == ZOK) {
-        new get_item_t(iozc, path);
+        iozc->schedule(new get_item_t(iozc, path));
     } else if(rc == ZNONODE) {
         iozc->set_no_node(path);
     } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         log_debug("stat_callback failed (%s), retrying", zerror(rc));
-        new watch_item_t(iozc, path);
+        iozc->schedule(new watch_item_t(iozc, path));
     } else if(rc == ZCLOSING) {
         log_debug("stat_callback: ZK closing");
     } else {
@@ -451,7 +451,7 @@ void io_zconf_t::new_session() {
     for(auto i = var_map_.begin(); i != var_map_.end(); ++i) {
         MKCSTR(key_z, i->first);
         log_debug("adding watch for %s", key_z);
-        new watch_item_t(this, i->first);
+        schedule(new watch_item_t(this, i->first));
     }
 }
 

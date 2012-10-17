@@ -174,7 +174,7 @@ public:
             return;
         } else if(rc == ZINVALIDSTATE) {
             log_debug("delete_item_t: zhandle is in ZINVALIDSTATE, retrying");
-            new delete_item_t(&zmaster_, epoch_);
+            zmaster_.schedule(new delete_item_t(&zmaster_, epoch_));
             return;
         } else {
             log_error("zoo_adelete returned %d (%s)", rc, zerror(rc));
@@ -208,7 +208,7 @@ void io_zmaster_t::delete_callback(int rc, const void* data) {
     } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         log_debug("delete_callback: timed out, retrying");
         guard.relax();
-        new delete_item_t(&zmaster, epoch);
+        zmaster.schedule(new delete_item_t(&zmaster, epoch));
     } else if(rc == ZCLOSING) {
         log_debug("delete_callback: ZK closing");
     } else {
@@ -264,7 +264,7 @@ public:
             return;
         } else if(rc == ZINVALIDSTATE) {
             log_debug("create_item_t: zhandle is in ZINVALIDSTATE, retrying");
-            new create_item_t(&zmaster_, epoch_);
+            zmaster_.schedule(new create_item_t(&zmaster_, epoch_));
             return;
         } else {
             log_error("zoo_acreate returned %d (%s)", rc, zerror(rc));
@@ -302,7 +302,7 @@ public:
         if(zmaster_.state_ == io_zmaster_t::CANCELING) {
             log_info("get_children_item_t(%d) canceled", epoch_);
             guard.relax();
-            new delete_item_t(&zmaster_, epoch_);
+            zmaster_.schedule(new delete_item_t(&zmaster_, epoch_));
             return;
         }
         assert(zmaster_.state_ == io_zmaster_t::REGISTERED);
@@ -322,7 +322,7 @@ public:
             return;
         } else if(rc == ZINVALIDSTATE) {
             log_debug("io_zmaster_t::get_children_item_t: zhandle is in ZINVALIDSTATE, retrying");
-            new get_children_item_t(&zmaster_, epoch_);
+            zmaster_.schedule(new get_children_item_t(&zmaster_, epoch_));
         } else {
             log_error("zoo_aget_children returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in zoo_aget_children");
@@ -360,7 +360,7 @@ public:
         if(zmaster_.state_ == io_zmaster_t::CANCELING) {
             log_info("watch_item_t(%d) canceled", epoch_);
             guard.relax();
-            new delete_item_t(&zmaster_, epoch_);
+            zmaster_.schedule(new delete_item_t(&zmaster_, epoch_));
             return;
         }
         assert(zmaster_.state_ == io_zmaster_t::SETTING_WATCH);
@@ -383,7 +383,7 @@ public:
             return;
         } else if(rc == ZINVALIDSTATE) {
             log_debug("watch_item_t: zhandle in ZINVALIDSTATE, retrying");
-            new watch_item_t(&zmaster_, epoch_, key_);
+            zmaster_.schedule(new watch_item_t(&zmaster_, epoch_, key_));
         } else {
             log_error("zoo_awexists returned %d (%s)", rc, zerror(rc));
             fatal("unknown state in watch_item_t");
@@ -418,10 +418,11 @@ public:
         if(zmaster_.state_ == io_zmaster_t::CANCELING) {
             log_info("set_master_item_t(%d) canceled", epoch_);
             guard.relax();
-            new delete_item_t(&zmaster_, epoch_);
+            zmaster_.schedule(new delete_item_t(&zmaster_, epoch_));
             return;
         }
         assert(zmaster_.state_ == io_zmaster_t::MASTER);
+        guard.relax();
 
         zmaster_.current_master_.set(zmaster_.seq_node_value(), -1);
         log_debug("set_master_item_t: success");
@@ -453,23 +454,27 @@ void io_zmaster_t::do_activate() {
              current_epoch_,
              current_epoch_);
     state_ = ACTIVATING;
-    new create_item_t(this, current_epoch_);
+    schedule(new create_item_t(this, current_epoch_));
 }
 
 void io_zmaster_t::deactivate() {
     bq_cond_guard_t guard(state_cond_);
-    log_info("io_zmaster_t::deactivate");
+    log_info("io_zmaster_t::deactivate()");
     do_deactivate();
 }
 
 void io_zmaster_t::do_deactivate() {
-    log_info("io_zmaster_t::deactivate()");
+    log_info("io_zmaster_t::do_deactivate()");
 
     if(state_ != INACTIVE) {
         state_t old_state = state_;
         state_ = CANCELING;
+        log_info("do_deactivate: [%d](%d) -> CANCELING(%d)",
+                 old_state,
+                 current_epoch_,
+                 current_epoch_);
         if(old_state == MASTER || old_state == WATCHING) {
-            new delete_item_t(this, current_epoch_);
+            schedule(new delete_item_t(this, current_epoch_));
         }
     }
 }
@@ -498,7 +503,7 @@ void io_zmaster_t::create_callback(int rc, const char* value, const void* data) 
             string_t::ctor_t(seq_node_path_len)(str_t(value, seq_node_path_len));
         if(zmaster.state_ == CANCELING) {
             log_info("io_zmaster_t::create_callback(success) canceled");
-            new delete_item_t(&zmaster, epoch);
+            zmaster.schedule(new delete_item_t(&zmaster, epoch));
         } else {
             assert(zmaster.state_ == REGISTERING);
             log_info("io_zmaster_t: REGISTERING(%d) -> REGISTERED(%d)",
@@ -507,7 +512,7 @@ void io_zmaster_t::create_callback(int rc, const char* value, const void* data) 
             zmaster.state_ = REGISTERED;
             guard.relax();
     
-            new get_children_item_t(&zmaster, epoch);
+            zmaster.schedule(new get_children_item_t(&zmaster, epoch));
         }
     } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         if(zmaster.state_ == CANCELING) {
@@ -518,7 +523,7 @@ void io_zmaster_t::create_callback(int rc, const char* value, const void* data) 
             log_debug("io_zmaster_t::create_callback timeout, retrying");
             guard.relax();
     
-            new create_item_t(&zmaster, epoch);
+            zmaster.schedule(new create_item_t(&zmaster, epoch));
         }
     } else if(rc == ZCLOSING) {
         log_debug("create_callback: ZK closing");
@@ -549,7 +554,8 @@ void io_zmaster_t::children_callback(int rc,
     if(zmaster.state_ == CANCELING) {
         log_info("children_callback(%d): canceled", epoch);
         guard.relax();
-        new delete_item_t(&zmaster, epoch);
+        zmaster.schedule(new delete_item_t(&zmaster, epoch));
+        return;
     }
     assert(zmaster.state_ == GETTING_CHILDREN);
 
@@ -562,7 +568,7 @@ void io_zmaster_t::children_callback(int rc,
                      epoch);
             zmaster.state_ = MASTER;
             guard.relax(); // ???
-            new set_master_item_t(&zmaster, epoch);
+            zmaster.schedule(new set_master_item_t(&zmaster, epoch));
         } else {
             log_info("io_zmaster_t: GETTING_CHILDREN(%d) -> SETTING_WATCH(%d)",
                      epoch,
@@ -570,11 +576,11 @@ void io_zmaster_t::children_callback(int rc,
             string_t watch_key = zmaster.make_full_path(strings->data[predecessor_index]);
             zmaster.state_ = SETTING_WATCH;
             guard.relax();
-            new watch_item_t(&zmaster, epoch, watch_key);
+            zmaster.schedule(new watch_item_t(&zmaster, epoch, watch_key));
         }
     } else if(rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS) {
         log_debug("children_callback: timed out, retrying");
-        new get_children_item_t(&zmaster, epoch);
+        zmaster.schedule(new get_children_item_t(&zmaster, epoch));
     } else if(rc == ZCLOSING) {
         log_debug("children_callback: ZK closing");
     } else {
@@ -609,7 +615,7 @@ void io_zmaster_t::watch_callback(int rc,
     if(zmaster.state_ == CANCELING) {
         log_info("watch_callback(%d) canceled", epoch);
         guard.relax();
-        new delete_item_t(&zmaster, epoch);
+        zmaster.schedule(new delete_item_t(&zmaster, epoch));
         return;
     }
     
@@ -626,7 +632,7 @@ void io_zmaster_t::watch_callback(int rc,
         ++zmaster.current_epoch_;
         guard.relax();
         zmaster.state_ = REGISTERED;
-        new get_children_item_t(&zmaster, epoch + 1);
+        zmaster.schedule(new get_children_item_t(&zmaster, epoch + 1));
     } else if(rc == ZCLOSING) {
         log_debug("watch_callback: ZK closing");
     } else {
@@ -680,7 +686,7 @@ void io_zmaster_t::deletion_watch(zhandle_t* /* zh */,
              epoch + 1);
     zmaster.state_ = REGISTERED;
     ++zmaster.current_epoch_;
-    new get_children_item_t(&zmaster, epoch + 1);
+    zmaster.schedule(new get_children_item_t(&zmaster, epoch + 1));
 }
 
 int io_zmaster_t::predecessor_index(const string_t& key,
@@ -716,7 +722,7 @@ void io_zmaster_t::new_session() {
         //  non-bq thread and do_activate waits on a
         //  bq condition variable. So we schedule
         //  an activation.
-        new activate_item_t(this, current_epoch_);
+        schedule(new activate_item_t(this, current_epoch_));
     }
 }
 

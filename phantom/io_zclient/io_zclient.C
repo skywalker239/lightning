@@ -61,23 +61,33 @@ void io_zclient_t::run() {
     }
 }
 
+void io_zclient_t::schedule(todo_item_t* todo_item) {
+    bq_cond_guard_t guard(todo_cond_);
+    todo_item->attach();
+}
+
 void io_zclient_t::stat(out_t&, bool) {
 }
 
 io_zclient_t::todo_item_t::todo_item_t(io_zclient_t* zclient)
-    : zclient_(zclient)
+    : zclient_(zclient),
+      next_(NULL),
+      me_(NULL)
 {
     log_debug("todo_item_t ctor(%p)", this);
-    bq_cond_guard_t guard(zclient_->todo_cond_);
-    *(me_ = zclient_->todo_last_) = this;
-    *(zclient_->todo_last_ = &next_) = NULL;
-    zclient_->todo_cond_.send();
 }
 
 io_zclient_t::todo_item_t::~todo_item_t() {
     if(zclient_) {
         detach();
     }
+}
+
+void io_zclient_t::todo_item_t::attach() {
+    assert(zclient_);
+    *(me_ = zclient_->todo_last_) = this;
+    *(zclient_->todo_last_ = &next_) = NULL;
+    zclient_->todo_cond_.send();
 }
 
 void io_zclient_t::todo_item_t::detach() {
