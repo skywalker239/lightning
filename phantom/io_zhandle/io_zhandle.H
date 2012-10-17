@@ -9,7 +9,7 @@
 
 #include <stdio.h>
 
-#include <zookeeper.h>
+#include <zookeeper/zookeeper.h>
 
 #pragma GCC visibility push(default)
 

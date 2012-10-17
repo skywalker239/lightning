@@ -1,4 +1,5 @@
 #include <phantom/io_zhandle/io_zhandle.H>
+#include <phantom/io_zhandle/zoo_util.H>
 #include <phantom/io_zclient/io_zclient.H>
 
 #include <pd/base/exception.H>
@@ -135,44 +136,6 @@ void io_zhandle_t::new_session_notify() {
     }
 }
 
-namespace {
-
-const char* state_string(int state) {
-    if(state == ZOO_EXPIRED_SESSION_STATE) {
-            return "ZOO_EXPIRED_SESSION_STATE";
-    } else if(state == ZOO_AUTH_FAILED_STATE) {
-            return "ZOO_AUTH_FAILED_STATE";
-    } else if(state == ZOO_CONNECTING_STATE) {
-            return "ZOO_CONNECTING_STATE";
-    } else if(state == ZOO_ASSOCIATING_STATE) {
-            return "ZOO_ASSOCIATING_STATE";
-    } else if(state == ZOO_CONNECTED_STATE) {
-            return "ZOO_CONNECTED_STATE";
-    } else {
-            return "ZOO_UNKNOWN_STATE";
-    }
-}
-
-const char* event_string(int type) {
-    if(type == ZOO_CREATED_EVENT) {
-            return "ZOO_CREATED_EVENT";
-    } else if(type == ZOO_DELETED_EVENT) {
-            return "ZOO_DELETED_EVENT";
-    } else if(type == ZOO_CHANGED_EVENT) {
-            return "ZOO_CHANGED_EVENT";
-    } else if(type == ZOO_CHILD_EVENT) {
-            return "ZOO_CHILD_EVENT";
-    } else if(type == ZOO_SESSION_EVENT) {
-            return "ZOO_SESSION_EVENT";
-    } else if(type == ZOO_NOTWATCHING_EVENT) {
-            return "ZOO_NOTWATCHING_EVENT";
-    } else {
-            return "ZOO_UNKNOWN_EVENT";
-    }
-}
-
-}  // anonymous namespace 
-
 void io_zhandle_t::global_watcher(zhandle_t*,
                                   int type,
                                   int state,
@@ -182,16 +145,9 @@ void io_zhandle_t::global_watcher(zhandle_t*,
     io_zhandle_t* iozh = reinterpret_cast<io_zhandle_t*>(ctx);
     log_debug("io_zhandle(%p): (%s, %s) at '%s'",
               iozh,
-              event_string(type),
-              state_string(state),
+              zoo_util::event_string(type),
+              zoo_util::state_string(state),
               path);
-
-    struct path_guard_t {
-        path_guard_t(const char* path) : path_(path) {}
-        ~path_guard_t() { free((void*)path_); }
-
-        const char* path_;
-    } path_guard(path);
 
     if(type == ZOO_SESSION_EVENT) {
         if(state == ZOO_CONNECTED_STATE) {
@@ -215,13 +171,13 @@ void io_zhandle_t::global_watcher(zhandle_t*,
             iozh->do_shutdown();
             iozh->do_connect();
         } else {
-            log_error("Unknown state %s", state_string(state));
+            log_error("Unknown state %s", zoo_util::state_string(state));
             fatal("unknown state");
         }
     } else {
         log_error("Spurious event (%s, %s) at '%s' at global watcher",
-                  event_string(type),
-                  state_string(state),
+                  zoo_util::event_string(type),
+                  zoo_util::state_string(state),
                   path);
         fatal("Unhandled zookeeper event at global watcher");
     }
