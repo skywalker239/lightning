@@ -31,36 +31,6 @@ bool io_zcluster_status_t::parse_host_id(const string_t& path, int* host_id) {
     return p0.parse<int>(*host_id);
 }
 
-class io_zcluster_status_t::del_item_t : public io_zclient_t::todo_item_t {
-public:
-    del_item_t(io_zcluster_status_t* zcluster_status,
-               int host_id,
-               int session_number)
-        : todo_item_t(zcluster_status),
-          zcluster_status_(*zcluster_status),
-          host_id_(host_id),
-          session_number_(session_number)
-    {}
-
-private:
-    virtual void apply() {
-        bq_cond_guard_t guard(zcluster_status_.state_cond_);
-        if(session_number_ != zcluster_status_.current_status_session_) {
-            log_info("del_item_t(%d, %d): session mismatch (%d)",
-                     host_id_, session_number_, zcluster_status_.current_status_session_);
-            return;
-        }
-        ref_t<host_status_list_t> new_status = zcluster_status_.current_status_->remove_host(host_id_);
-        zcluster_status_.current_status_ = new_status;
-        guard.relax();
-        zcluster_status_.signal_listeners(new_status);
-    }
-
-    io_zcluster_status_t& zcluster_status_;
-    int host_id_;
-    int session_number_;
-};
-
 class io_zcluster_status_t::get_item_t : public io_zclient_t::todo_item_t {
 public:
     get_item_t(io_zcluster_status_t* zcluster_status,
@@ -192,6 +162,7 @@ private:
                     log_info("set_item_t::apply: ZNONODE, retrying");
                     //! Need to reschedule because this item blocks the possible pending create.
                     zcluster_status_.schedule(new set_item_t(&zcluster_status_, value_, set_number_));
+                    return;
                     break;
                 }
                 case ZINVALIDSTATE:
@@ -520,13 +491,7 @@ void io_zcluster_status_t::node_watch(zhandle_t* /* zh */,
     string_t path_str = string_t::ctor_t(path_len)(str_t(path, path_len));
 
     if(type == ZOO_DELETED_EVENT) {
-        int host_id = -1;
-        if(!zcluster_status->parse_host_id(path_str, &host_id)) {
-            log_info("node_watch at ('%s', ZOO_DELETED_EVENT) cannot parse host id", path);
-            return;
-        }
-        bq_cond_guard_t guard(zcluster_status->state_cond_);
-        zcluster_status->schedule(new del_item_t(zcluster_status, host_id, zcluster_status->current_status_session_));
+        log_info("doing nothing for ZOO_DELETED_EVENT at %s", path);
     } else if(type == ZOO_CHANGED_EVENT) {
         bq_cond_guard_t guard(zcluster_status->state_cond_);
         zcluster_status->schedule(new get_item_t(zcluster_status, path_str, zcluster_status->current_status_session_));

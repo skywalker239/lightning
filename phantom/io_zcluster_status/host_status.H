@@ -21,7 +21,6 @@ public:
 
     ref_t<host_status_t> amend_host(int host_id,
                                     const string_t& status) const;
-    ref_t<host_status_t> remove_host(int host_id) const;
 private:
     const int host_id_;
     const string_t status_;
@@ -38,7 +37,6 @@ public:
 
     ref_t<host_status_list_t> amend_host(int host_id,
                                          const string_t& status) const;
-    ref_t<host_status_list_t> remove_host(int host_id) const;
 private:
     ref_t<host_status_t> head_;
 

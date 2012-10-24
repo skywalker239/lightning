@@ -7,6 +7,8 @@
 
 #include <phantom/io_zclient/io_zclient.H>
 
+#pragma GCC visibility push(default)
+
 namespace phantom {
 
 class io_zcluster_status_t : public io_zclient_t {
@@ -63,7 +65,6 @@ private:
 
     class __hidden new_session_item_t;
     class __hidden get_item_t;
-    class __hidden del_item_t;
     class __hidden set_item_t;
 
     void signal_listeners(ref_t<host_status_list_t> status);
@@ -72,9 +73,11 @@ private:
     mutable thr::spinlock_t listeners_lock_;
     
     friend class new_session_item_t;
-    friend class del_item_t;
     friend class get_item_t;
     friend class set_item_t;
 };
 
 }  // namespace phantom
+
+#pragma GCC visibility pop
+

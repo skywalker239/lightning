@@ -2,6 +2,8 @@
 
 #include <phantom/io_zcluster_status/host_status.H>
 
+#pragma GCC visibility push(default)
+
 namespace phantom {
 
 class status_listener_t {
@@ -17,3 +19,5 @@ private:
 };
 
 }  // namespace phantom
+
+#pragma GCC visibility pop
