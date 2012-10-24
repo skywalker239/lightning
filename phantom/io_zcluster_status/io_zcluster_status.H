@@ -38,8 +38,6 @@ private:
     
     virtual void new_session();
 
-    virtual void run();
-
     static void node_watch(zhandle_t* zh,
                            int type,
                            int state,

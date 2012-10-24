@@ -13,6 +13,14 @@ namespace phantom {
 
 MODULE(io_zcluster_status);
 
+string_t io_zcluster_status_t::status_node_full_path() const {
+    return string_t::ctor_t(path_.size() + 16)(path_)('/').print(host_id_);
+}
+
+string_t io_zcluster_status_t::make_full_path(const string_t& node_name) const {
+    return string_t::ctor_t(path_.size() + node_name.size() + 1)(path_)('/')(node_name);
+}
+
 bool io_zcluster_status_t::parse_host_id(const string_t& path, int* host_id) {
     in_t::ptr_t p(path);
     in_t::ptr_t p0(p);
@@ -214,11 +222,13 @@ class io_zcluster_status_t::new_session_item_t : public io_zclient_t::todo_item_
 public:
     new_session_item_t(io_zcluster_status_t* zcluster_status,
                        int session_number,
-                       const string_t& our_status)
+                       const string_t& our_status,
+                       bool create_node)
         : todo_item_t(zcluster_status),
           zcluster_status_(*zcluster_status),
           session_number_(session_number),
           our_status_(our_status),
+          create_node_(create_node),
           zhandle_(NULL),
           new_status_(new host_status_list_t)
     {}
@@ -371,9 +381,11 @@ private:
 
         zhandle_ = zcluster_status_.zhandle_.wait();
         zguard.relax();
-        
-        if(!create_node()) {
-            return;
+
+        if(create_node_) {
+            if(!create_node()) {
+                return;
+            }
         }
 
         if(!get_children()) {
@@ -384,10 +396,10 @@ private:
         }
 
         bq_cond_guard_t guard(zcluster_status_.state_cond_);
-        if(zcluster_status_.current_session_ > session_number_) {
+        if(zcluster_status_.current_status_session_ > session_number_) {
             log_info("new_session_item: session %d, obj has %d, aborting",
                      session_number_,
-                     zcluster_status_.current_session_);
+                     zcluster_status_.current_status_session_);
             return;
         }
         zcluster_status_.current_status_ = new_status_;
@@ -400,6 +412,7 @@ private:
     io_zcluster_status_t& zcluster_status_;
     int session_number_;
     const string_t our_status_;
+    bool create_node_;
     zhandle_t* zhandle_;
     std::list<string_t> children_;
     ref_t<host_status_list_t> new_status_;
@@ -424,6 +437,7 @@ io_zcluster_status_t::io_zcluster_status_t(const string_t& name, const config_t&
     : io_zclient_t(name, config),
       host_id_(config.host_id),
       path_(config.path),
+      current_status_(new host_status_list_t),
       current_status_session_(-1),
       current_session_(0),
       last_set_status_(string_t::ctor_t(3)(CSTR("{}"))),
@@ -482,10 +496,10 @@ void io_zcluster_status_t::update(const string_t& new_status) {
 }
 
 void io_zcluster_status_t::new_session() {
-    log_info("io_zcluster_status_t::new_session");
     bq_cond_guard_t guard(state_cond_);
     int session_number = current_session_++;
-    schedule(new new_session_item_t(this, session_number, last_set_status_));
+    log_info("io_zcluster_status_t::new_session(%d)", session_number);
+    schedule(new new_session_item_t(this, session_number, last_set_status_, true));
 }
 
 void io_zcluster_status_t::node_watch(zhandle_t* /* zh */,
@@ -494,8 +508,10 @@ void io_zcluster_status_t::node_watch(zhandle_t* /* zh */,
                                       const char* path,
                                       void* watcherCtx)
 {
-    if(state != ZOO_CONNECTED_STATE) {
-        log_info("zcluster_status::node_watch ignoring state %s", zoo_util::state_string(state));
+    if(state != ZOO_CONNECTED_STATE ||
+      (state == ZOO_CONNECTED_STATE && type == ZOO_SESSION_EVENT))
+    {
+        log_info("zcluster_status::node_watch ignoring state (%s, %s)", zoo_util::event_string(type), zoo_util::state_string(state));
         return;
     }
 
@@ -529,8 +545,11 @@ void io_zcluster_status_t::children_watch(zhandle_t* /* zh */,
                                           const char* path,
                                           void* watcherCtx)
 {
-    if(state != ZOO_CONNECTED_STATE) {
-        log_info("zcluster_status::children_watch ignoring state %s", zoo_util::state_string(state));
+    if(state != ZOO_CONNECTED_STATE ||
+       (state == ZOO_CONNECTED_STATE && type == ZOO_SESSION_EVENT))
+    {
+        log_info("zcluster_status::children_watch ignoring state (%s, %s)", zoo_util::event_string(type), zoo_util::state_string(state));
+        return;
     }
 
     io_zcluster_status_t* zcluster_status = (io_zcluster_status_t*) watcherCtx;
@@ -538,7 +557,7 @@ void io_zcluster_status_t::children_watch(zhandle_t* /* zh */,
     if(type == ZOO_CHILD_EVENT) {
         bq_cond_guard_t guard(zcluster_status->state_cond_);
         int session_number = zcluster_status->current_session_++;
-        zcluster_status->schedule(new new_session_item_t(zcluster_status, session_number, zcluster_status->last_set_status_));
+        zcluster_status->schedule(new new_session_item_t(zcluster_status, session_number, zcluster_status->last_set_status_, false));
     } else {
         log_error("Unhandled event (%s, %s) at '%s'",
                   zoo_util::event_string(type),
@@ -554,5 +573,13 @@ void io_zcluster_status_t::signal_listeners(ref_t<host_status_list_t> status) {
         l->notify(status);
     }
 }
+
+namespace io_zcluster_status {
+config_binding_sname(io_zcluster_status_t);
+config_binding_value(io_zcluster_status_t, host_id);
+config_binding_value(io_zcluster_status_t, path);
+config_binding_parent(io_zcluster_status_t, io_zclient_t, 1);
+config_binding_ctor(io_t, io_zcluster_status_t);
+}  // namespace io_zcluster_status
 
 }  // namespace phantom

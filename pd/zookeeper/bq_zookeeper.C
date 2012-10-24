@@ -36,11 +36,11 @@ struct string_callback_data_t {
 
 void string_completion(int rc, const char* value, const void* data) {
     string_callback_data_t* cbdata = (string_callback_data_t*) data;
-    size_t value_length = strlen(value);
 
     bq_cond_guard_t guard(cbdata->cond);
     cbdata->rc = rc;
     if(rc == ZOK) {
+        size_t value_length = strlen(value);
         *(cbdata->result) = string_t::ctor_t(value_length)(str_t(value, value_length));
     }
     cbdata->cond.send();
