@@ -37,10 +37,10 @@ void io_blob_sender_t::config_t::check(const in_t::ptr_t& p) const {
         }
     } else {
         if(address) {
-            config::error(p, "with multicast, io_blob_sender_t.address must be unset");
+            config::error(p, "without multicast, io_blob_sender_t.address must be unset");
         }
         if(port) {
-            config::error(p, "with multicast, io_blob_sender_t.port must be unset");
+            config::error(p, "without multicast, io_blob_sender_t.port must be unset");
         }
     }
     if(!max_datagram_size) {
@@ -48,7 +48,7 @@ void io_blob_sender_t::config_t::check(const in_t::ptr_t& p) const {
     }
     //! 20 is IP header, 8 is UDP header, (uint64, 3 * uint32) is chunk header.
     if(max_datagram_size > 8950 - 20 - 8 - 3 * sizeof(uint32_t) - sizeof(uint64_t)) {
-        config::error(p, "max_datagram_size is too large (won't fit into a jumbo frame");
+        config::error(p, "max_datagram_size is too large (won't fit into a jumbo frame)");
     }
 }
 
@@ -144,6 +144,7 @@ void io_blob_sender_t::send(uint64_t guid,
                   &dups_);
     __sync_fetch_and_add(&blobs_sent_, 1);
     pi_t::print_app(out, &value);
+    out.flush_all();
 }
 
 namespace io_blob_sender {

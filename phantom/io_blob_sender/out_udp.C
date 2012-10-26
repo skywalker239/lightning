@@ -105,7 +105,11 @@ ssize_t out_udp_t::do_sendmsg(const struct msghdr* msg) {
             if(fd2 < 0) {
                 throw exception_sys_t(log::error | log::trace, errno, "dup: %m");
             }
-            return bq_sendmsg(fd2, msg, 0, NULL);
+            res = bq_sendmsg(fd2, msg, 0, NULL);
+            if(::close(fd2) < 0) {
+                throw exception_sys_t(log::error | log::trace, errno, "close: %m");
+            }
+            return res;
         } else {
             throw exception_sys_t(log::error | log::trace, errno, "sendmsg: %m");
         }
