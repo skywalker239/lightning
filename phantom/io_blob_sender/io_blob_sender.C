@@ -1,5 +1,4 @@
 #include <phantom/io_blob_sender/io_blob_sender.H>
-#include <phantom/io_blob_sender/mem_heap.H>
 #include <phantom/io_blob_sender/out_udp.H>
 
 #include <pd/base/assert.H>
@@ -122,20 +121,18 @@ void io_blob_sender_t::stat(out_t& out, bool /* clear */) {
     pi_t::pro_t::map_t map = { 4, items };
     pi_t::pro_t pro(map);
 
-    mem_heap_t mem;
-    pi_t::root_t* root = pi_t::build(pro, mem);
-    pi_t::print_text(out, root);
-    mem.free(root);
+    ref_t<pi_ext_t> value = pi_ext_t::__build(pro);
+    pi_t::print_text(out, &value->root());
 }
 
 void io_blob_sender_t::send(uint64_t guid,
-                            const pi_t::root_t& value,
+                            ref_t<pi_ext_t> value,
                             const netaddr_ipv4_t& dst)
 {
     char buffer[max_datagram_size_];
     out_udp_t out(buffer,
                   sizeof(buffer),
-                  value.size * sizeof(value.size),
+                  value->root().size * sizeof(value->root().size),
                   fd_,
                   multicast_ ? address_ : dst,
                   guid,
@@ -143,7 +140,7 @@ void io_blob_sender_t::send(uint64_t guid,
                   &packets_sent_,
                   &dups_);
     __sync_fetch_and_add(&blobs_sent_, 1);
-    pi_t::print_app(out, &value);
+    pi_t::print_app(out, &value->root());
     out.flush_all();
 }
 

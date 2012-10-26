@@ -3,7 +3,8 @@
 #include <pd/base/config_enum.H>
 #include <pd/base/ipv4.H>
 #include <pd/base/netaddr_ipv4.H>
-#include <pd/pi/pi.H>
+
+#include <pd/lightning/pi_ext.H>
 
 #include <phantom/io.H>
 #include <phantom/io_blob_sender/out_udp.H>
@@ -29,7 +30,7 @@ public:
     ~io_blob_sender_t();
 
     void send(uint64_t guid,
-              const pi_t::root_t& value,
+              ref_t<pi_ext_t> value,
               const netaddr_ipv4_t& destination = netaddr_ipv4_t());
 private:
     virtual void init();
