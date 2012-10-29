@@ -272,7 +272,7 @@ public:
 	}
 
 	inline str_t s_str() const throw();
-	inline pi_t const &s_ind(count_t k);
+	inline pi_t const &s_ind(count_t k) const;
 
 	struct place_t {
 		union {
@@ -430,7 +430,7 @@ struct pi_t::map_item_t {
 
 extern pi_t const pi_null;
 
-inline pi_t const &pi_t::s_ind(count_t k) {
+inline pi_t const &pi_t::s_ind(count_t k) const {
 	if(type() == _array) {
 		array_t const &arr = __array();
 		if(k < arr.count)
