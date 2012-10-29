@@ -3,7 +3,7 @@
 #include <phantom/io.H>
 
 #include <pd/base/config_list.H>
-#include <pd/lightning/var_base.H>
+#include <pd/lightning/simple_var.H>
 
 #include <phantom/io_zconf/io_zconf.H>>
 
@@ -38,8 +38,8 @@ private:
     void set_loop();
 
     io_zconf_t& zconf_;
-    var_base_t set_var_;
-    std::vector<var_base_t*> vars_;
+    simple_var_t<string_t> set_var_;
+    std::vector<simple_var_t<string_t>* > vars_;
 };
 
 }  // namespace phantom

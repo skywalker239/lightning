@@ -424,7 +424,7 @@ public:
         assert(zmaster_.state_ == io_zmaster_t::MASTER);
         guard.relax();
 
-        zmaster_.current_master_.set(zmaster_.seq_node_value(), -1);
+        zmaster_.current_master_.set(zmaster_.host_id_, -1);
         log_debug("set_master_item_t: success");
     }
 private:

@@ -11,8 +11,10 @@ namespace pd {
 class var_base_t {
 public:
     var_base_t(const string_t& key, phantom::io_zconf_t* io_zconf);
+    var_base_t(const var_base_t& other);
+    var_base_t& operator=(const var_base_t& other);
 
-    ~var_base_t();
+    virtual ~var_base_t();
 
     //! Used to override version check on set().
     static const int kAnyVersion = -1;
@@ -27,10 +29,6 @@ public:
     //  old_version.
     int wait(int old_version);
 
-    //! Resets the variable to a new value. Blocks until ZK call completes.
-    //  Does not reset the local copy (i.e. call set() and then update).
-    //  
-    bool set(const string_t& value, int version);
 
     int version() const;
 
@@ -38,6 +36,11 @@ public:
 
     const string_t& key() const;
 protected:
+    //! Resets the variable to a new value. Blocks until ZK call completes.
+    //  Does not reset the local copy (i.e. call set() and then update).
+    //  
+    bool do_set(const string_t& value, int version);
+
     int version_;
     string_t value_string_;
 
@@ -45,9 +48,6 @@ protected:
     //  data the descendant class is interested in.
     virtual void update_impl() {}
 private:
-    var_base_t(const var_base_t&) = delete;
-    var_base_t& operator=(const var_base_t&) = delete;
-
     void update_internal();
 
     string_t key_;

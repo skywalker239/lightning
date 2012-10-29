@@ -36,7 +36,7 @@ io_toy_zk_client_t::io_toy_zk_client_t(const string_t& name,
     {
         MKCSTR(key_z, p.val());
         log_info("creating var %s", key_z);
-        vars_.push_back(new var_base_t(p.val(), &zconf_));
+        vars_.push_back(new simple_var_t<string_t>(p.val(), &zconf_));
     }
 }
 
@@ -61,13 +61,13 @@ void io_toy_zk_client_t::run() {
             *vars_[i]);
     }
 
-/*    string_t set_job_name = string_t::ctor_t(set_var_.key().size() + 3 + 2)
+    string_t set_job_name = string_t::ctor_t(set_var_.key().size() + 3 + 2)
                                 (CSTR("set["))(set_var_.key())(']');
     bq_job_t<typeof(&io_toy_zk_client_t::set_loop)>::create(
         set_job_name,
         scheduler.bq_thr(),
         *this,
-        &io_toy_zk_client_t::set_loop);*/
+        &io_toy_zk_client_t::set_loop);
 }
 
 void io_toy_zk_client_t::loop(var_base_t& var) {

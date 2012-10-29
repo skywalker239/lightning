@@ -9,8 +9,26 @@ var_base_t::var_base_t(const string_t& key, io_zconf_t* io_zconf)
     : version_(kAnyVersion),
       key_(key),
       io_zconf_(io_zconf),
-      stat_(io_zconf_->add_var_ref(key))
+      stat_(io_zconf_->add_var_ref(key_))
 {}
+
+var_base_t::var_base_t(const var_base_t& other)
+    : version_(other.version_),
+      key_(other.key_),
+      io_zconf_(other.io_zconf_),
+      stat_(io_zconf_->add_var_ref(key_))
+{}
+
+var_base_t& var_base_t::operator=(const var_base_t& other) {
+    stat_ = NULL;
+    io_zconf_->remove_var_ref(key_);
+
+    version_ = other.version_;
+    key_ = other.key_;
+    io_zconf_ = other.io_zconf_;
+    stat_ = io_zconf_->add_var_ref(key_);
+    return *this;
+}
 
 var_base_t::~var_base_t() {
     stat_ = NULL;
@@ -76,7 +94,7 @@ int var_base_t::wait(int old_version) {
     return version_;
 }
 
-bool var_base_t::set(const string_t& value, int version) {
+bool var_base_t::do_set(const string_t& value, int version) {
     return io_zconf_->set(key_, value, version);
 }
 

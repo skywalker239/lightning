@@ -4,7 +4,7 @@
 
 #include <pd/bq/bq_cond.H>
 
-#include <pd/lightning/var_base.H>
+#include <pd/lightning/simple_var.H>
 
 #include <phantom/io_zconf/io_zconf.H>
 #include <phantom/io_zclient/io_zclient.H>
@@ -96,7 +96,7 @@ private:
     const int host_id_;
     const string_t election_path_;
 
-    var_base_t current_master_;
+    simple_var_t<int> current_master_;
 
     enum state_t {
         INACTIVE,
