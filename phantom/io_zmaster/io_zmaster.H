@@ -4,7 +4,7 @@
 
 #include <pd/bq/bq_cond.H>
 
-#include <pd/vars/var_base.H>
+#include <pd/lightning/var_base.H>
 
 #include <phantom/io_zconf/io_zconf.H>
 #include <phantom/io_zclient/io_zclient.H>

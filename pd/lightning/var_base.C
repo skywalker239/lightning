@@ -1,4 +1,4 @@
-#include <pd/vars/var_base.H>
+#include <pd/lightning/var_base.H>
 #include <pd/base/exception.H>
 
 namespace pd {

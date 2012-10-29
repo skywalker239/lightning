@@ -3,7 +3,7 @@
 #include <phantom/io.H>
 
 #include <pd/base/config_list.H>
-#include <pd/vars/var_base.H>
+#include <pd/lightning/var_base.H>
 
 #include <phantom/io_zconf/io_zconf.H>>
 

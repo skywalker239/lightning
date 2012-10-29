@@ -4,7 +4,6 @@ include /usr/share/phantom/library.mk
 
 $(eval $(call LIBRARY,pi))
 $(eval $(call LIBRARY,lightning))
-$(eval $(call LIBRARY,vars))
 $(eval $(call LIBRARY,zookeeper))
 
 include /usr/share/phantom/module.mk
@@ -13,8 +12,8 @@ $(eval $(call MODULE,io_blob_sender,,pi lightning,))
 $(eval $(call MODULE,io_zclient,,,))
 $(eval $(call MODULE,io_zhandle,,,zookeeper_mt))
 $(eval $(call MODULE,io_zcluster_status,,zookeeper,))
-$(eval $(call MODULE,io_zconf,,vars,))
-$(eval $(call MODULE,io_zmaster,,vars,))
+$(eval $(call MODULE,io_zconf,,lightning,))
+$(eval $(call MODULE,io_zmaster,,lightning,))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude
 
