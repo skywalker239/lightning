@@ -15,6 +15,7 @@ $(eval $(call MODULE,io_zhandle,,,zookeeper_mt))
 $(eval $(call MODULE,io_zcluster_status,,zookeeper,))
 $(eval $(call MODULE,io_zconf,,pi lightning,))
 $(eval $(call MODULE,io_zmaster,,lightning,))
+$(eval $(call MODULE,io_transport_config,,pi lightning,))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude
 
