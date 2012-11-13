@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #pragma once
 
 #include <phantom/io.H>
@@ -9,23 +10,25 @@ namespace phantom {
 
 class io_guid_t : public io_t {
 public:
-	struct config_t : public io_t::config_t {
-		int host_id;
+    struct config_t : public io_t::config_t {
+        int host_id;
 
-		config_t() throw();
-		~config_t() throw() {};
-		void check(const in_t::ptr_t& p) const;
-	};
-	guid_generator_t guid_;
+        config_t() throw();
+        ~config_t() throw() {};
+        void check(const in_t::ptr_t& p) const;
+    };
 
-	io_guid_t(const string_t& name, const config_t& config);
-	~io_guid_t() throw() {}
+    io_guid_t(const string_t& name, const config_t& config);
+    ~io_guid_t() throw() {}
+
+    guid_generator_t& generator();
 private:
-	virtual void init();
-	virtual void run();
-	virtual void fini();
+    guid_generator_t guid_;
+    virtual void init();
+    virtual void run();
+    virtual void fini();
 
-	virtual void stat(out_t& out, bool clear);
+    virtual void stat(out_t& out, bool clear);
 };
 
 } // namespace phantom
