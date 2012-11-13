@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <pd/base/in.H>
 #include <pd/base/string.H>
 

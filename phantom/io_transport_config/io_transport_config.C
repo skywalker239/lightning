@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <phantom/io_transport_config/io_transport_config.H>
 
 namespace phantom {

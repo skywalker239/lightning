@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <phantom/io_blob_receiver/lru_cache.H>
 
 namespace phantom {

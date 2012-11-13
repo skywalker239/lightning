@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <phantom/io_blob_sender/io_blob_sender.H>
 #include <phantom/io_blob_sender/out_udp.H>
 

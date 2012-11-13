@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <phantom/io_zmaster/io_zmaster.H>
 #include <phantom/io_zhandle/zoo_util.H>
 

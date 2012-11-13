@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include "commit_tracker.H"
 
 namespace pd {
