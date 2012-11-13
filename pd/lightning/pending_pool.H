@@ -24,7 +24,7 @@ public:
     //  If it is not possible to insert a new instance, returns NULL.
     virtual ref_t<acceptor_instance_t> lookup(instance_id_t iid);
 
-    //! Throws an exception (all manipulations must be done with
+    //! Always returns false (all manipulations must be done with
     //  mutating the reference that lookup() returns).
     virtual bool store(instance_id_t iid,
                        ref_t<acceptor_instance_t> instance);

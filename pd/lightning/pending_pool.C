@@ -25,10 +25,10 @@ ref_t<acceptor_instance_t> pending_pool_t::lookup(instance_id_t iid) {
     return init_and_fetch_instance(iid);
 }
 
-bool pending_pool_t::store(instance_id_t iid,
+bool pending_pool_t::store(instance_id_t,
                            ref_t<acceptor_instance_t>)
 {
-    throw exception_log_t(log::error, "pending_pool.store(%ld)", iid);
+    return false;
 }
 
 void pending_pool_t::updated(instance_id_t iid)
