@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <pd/lightning/value_cache.H>
 #include <pd/base/assert.H>
 
