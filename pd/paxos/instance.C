@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include "instance.H"
 #include <pd/base/assert.H>
 

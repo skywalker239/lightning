@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <pd/lightning/wait_pool.H>
 #include <pd/base/cmp.H>
 

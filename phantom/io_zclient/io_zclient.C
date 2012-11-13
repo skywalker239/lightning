@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <phantom/io_zclient/io_zclient.H>
 
 #include <pd/base/exception.H>

@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <pd/lightning/snapshot_var.H>
 #include <pd/pi/pi.H>
 #include <pd/lightning/pi_ext.H>

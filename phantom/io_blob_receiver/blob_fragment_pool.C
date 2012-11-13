@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <phantom/io_blob_receiver/blob_fragment_pool.H>
 
 #include <pd/base/log.H>

@@ -1,3 +1,4 @@
+// vim: set tabstop=4 expandtab:
 #include <pd/lightning/var_base.H>
 #include <pd/base/exception.H>
 
