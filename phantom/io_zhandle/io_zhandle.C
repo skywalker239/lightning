@@ -25,8 +25,9 @@ io_zhandle_t::io_zhandle_t(const string_t& name, const config_t& config)
       zookeeper_log_path_(config.zookeeper_log),
       zhandle_(NULL),
       zookeeper_log_(NULL),
+      zookeeper_log_level_(config.zookeeper_log_level),
       connected_(false),
-      fresh_session_(true),
+      session_is_fresh_(true),
       clients_(NULL)
 {}
 
@@ -71,7 +72,7 @@ void io_zhandle_t::deregister_client(io_zclient_t* client) {
 }
 
 void io_zhandle_t::init() {
-    zoo_set_debug_level(ZOO_LOG_LEVEL_DEBUG);
+    zoo_set_debug_level(zookeeper_log_level_);
     if(zookeeper_log_path_.size() != 0) {
         MKCSTR(log_path_z, zookeeper_log_path_);
         zookeeper_log_ = fopen(log_path_z, "a");
@@ -126,7 +127,7 @@ void io_zhandle_t::do_shutdown() {
         }
     }
     connected_ = false;
-    fresh_session_ = true;
+    session_is_fresh_ = true;
 }
 
 void io_zhandle_t::new_session_notify() {
@@ -157,9 +158,9 @@ void io_zhandle_t::global_watcher(zhandle_t*,
             iozh->connected_ = true;
             iozh->connected_cond_.send(true);
             log_debug("zhandle(%p): connected.", iozh);
-            if(iozh->fresh_session_) {
+            if(iozh->session_is_fresh_) {
                 iozh->new_session_notify();
-                iozh->fresh_session_ = false;
+                iozh->session_is_fresh_ = false;
             }
         } else if(state == ZOO_CONNECTING_STATE) {
             bq_cond_guard_t guard(iozh->connected_cond_);
@@ -185,6 +186,11 @@ void io_zhandle_t::global_watcher(zhandle_t*,
 }
 
 namespace io_zhandle {
+config_enum_sname(ZooLogLevel);
+config_enum_value(ZooLogLevel, ZOO_LOG_LEVEL_ERROR);
+config_enum_value(ZooLogLevel, ZOO_LOG_LEVEL_WARN);
+config_enum_value(ZooLogLevel, ZOO_LOG_LEVEL_INFO);
+config_enum_value(ZooLogLevel, ZOO_LOG_LEVEL_DEBUG);
 config_binding_sname(io_zhandle_t);
 config_binding_value(io_zhandle_t, servers);
 config_binding_value(io_zhandle_t, zookeeper_log);
