@@ -41,37 +41,49 @@ void io_zclient_t::fini() {
     zhandle_.deregister_client(this);
 }
 
+io_zclient_t::todo_item_t* io_zclient_t::next_todo() {
+    bq_cond_guard_t guard(todo_cond_);
+    log_debug("io_zclient(%p) waiting on todo_cond", this);
+
+    if(!todo_list_) {
+        if(!bq_success(todo_cond_.wait(NULL))) {
+            throw exception_sys_t(log::error, errno, "todo_cond_.wait: %m");
+        }
+    }
+
+    todo_item_t* todo = todo_list_;
+    todo->detach();
+    return todo;
+}
+
+zhandle_t* io_zclient_t::get_zhandle() {
+    zhandle_guard_t zguard(zhandle_);
+    return zhandle_.wait();
+}
+
 void io_zclient_t::run() {
     while(true) {
-        bq_cond_guard_t guard(todo_cond_);
-        log_debug("io_zclient(%p) waiting on todo_cond", this);
-        
-        if(!todo_list_) {
-            if(!bq_success(todo_cond_.wait(NULL))) {
-                throw exception_sys_t(log::error, errno, "todo_cond_.wait: %m");
-            }
-        }
-
-        todo_item_t* todo = todo_list_;
-        todo->detach();
-        guard.relax();
-        log_debug("io_zclient(%p) released todo_cond, got todo %p", this, todo);
-
-        todo->apply();
+        todo_item_t* todo = next_todo();
+        zhandle_t* zhandle = get_zhandle();
+        log_debug("io_zclient(%p) released todo_cond, got todo %p, zhandle %p",
+                  this,
+                  todo,
+                  zhandle);
+        todo->apply(zhandle);
         delete todo;
     }
 }
 
 void io_zclient_t::schedule(todo_item_t* todo_item) {
     bq_cond_guard_t guard(todo_cond_);
-    todo_item->attach();
+    todo_item->attach(this);
 }
 
 void io_zclient_t::stat(out_t&, bool) {
 }
 
-io_zclient_t::todo_item_t::todo_item_t(io_zclient_t* zclient)
-    : zclient_(zclient),
+io_zclient_t::todo_item_t::todo_item_t()
+    : zclient_(NULL),
       next_(NULL),
       me_(NULL)
 {
@@ -84,8 +96,9 @@ io_zclient_t::todo_item_t::~todo_item_t() {
     }
 }
 
-void io_zclient_t::todo_item_t::attach() {
-    assert(zclient_);
+void io_zclient_t::todo_item_t::attach(io_zclient_t* zclient) {
+    assert(!zclient_);
+    zclient_ = zclient;
     *(me_ = zclient_->todo_last_) = this;
     *(zclient_->todo_last_ = &next_) = NULL;
     zclient_->todo_cond_.send();
