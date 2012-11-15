@@ -44,7 +44,11 @@ public:
         //! Applies this action, using zhandle as the
         //  current Zookeeper session handle.
         //  (called by the zclient that has just detached this item)
-        virtual void apply(zhandle_t* zhandle) = 0;
+        //
+        //  Returns false if zclient must try to reapply it
+        //  (e.g. if zhandle has gone invalid by the time apply()
+        //  started executing).
+        virtual bool apply(zhandle_t* zhandle) = 0;
     private:
         io_zclient_t* zclient_;
         todo_item_t* next_;

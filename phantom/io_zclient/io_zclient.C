@@ -64,12 +64,15 @@ zhandle_t* io_zclient_t::get_zhandle() {
 void io_zclient_t::run() {
     while(true) {
         todo_item_t* todo = next_todo();
-        zhandle_t* zhandle = get_zhandle();
-        log_debug("io_zclient(%p) released todo_cond, got todo %p, zhandle %p",
-                  this,
-                  todo,
-                  zhandle);
-        todo->apply(zhandle);
+        zhandle_t* zhandle = NULL;
+        do {
+            zhandle = get_zhandle();
+            log_debug(
+                "io_zclient(%p) released todo_cond, got todo %p, zhandle %p",
+                this,
+                todo,
+                zhandle);
+        } while(!todo->apply(zhandle));
         delete todo;
     }
 }
