@@ -89,6 +89,10 @@ bool acceptor_instance_t::commit(value_id_t value)
     return true;
 }
 
+instance_id_t acceptor_instance_t::instance_id() const {
+    return instance_id_;
+}
+
 bool acceptor_instance_t::committed() const {
     thr::spinlock_guard_t guard(lock_);
     return committed_;
