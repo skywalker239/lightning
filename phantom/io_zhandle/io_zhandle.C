@@ -194,6 +194,7 @@ config_enum_value(ZooLogLevel, ZOO_LOG_LEVEL_DEBUG);
 config_binding_sname(io_zhandle_t);
 config_binding_value(io_zhandle_t, servers);
 config_binding_value(io_zhandle_t, zookeeper_log);
+config_binding_value(io_zhandle_t, zookeeper_log_level);
 config_binding_parent(io_zhandle_t, io_t, 1);
 config_binding_ctor(io_t, io_zhandle_t);
 }  // namespace io_zhandle
