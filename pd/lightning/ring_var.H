@@ -11,7 +11,7 @@ namespace pd {
 //  participating hosts. The first host in the ring is its master.
 class ring_var_t : public var_base_t {
 public:
-    ring_var_t(const string_t& key, phantom::io_zconf_t* io_zconf);
+    ring_var_t(const string_t& key, var_store_t& store);
 
     //! False iff failed to parse current ring from Zookeeper.
     bool valid() const;

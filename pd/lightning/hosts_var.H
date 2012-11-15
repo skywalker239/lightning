@@ -10,7 +10,7 @@ namespace pd {
 //  The hosts are numbered with host ids in the range [0, num_of_hosts).
 class hosts_var_t : public var_base_t {
 public:
-    hosts_var_t(const string_t& key, phantom::io_zconf_t* io_zconf);
+    hosts_var_t(const string_t& key, var_store_t& store);
 
     //! False iff failed to parse from the Zookeeper node.
     bool valid() const;

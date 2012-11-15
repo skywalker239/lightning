@@ -11,8 +11,8 @@ namespace pd {
 template<typename T>
 class simple_var_t : public var_base_t {
 public:
-    simple_var_t(const string_t& key, phantom::io_zconf_t* io_zconf)
-        : var_base_t(key, io_zconf),
+    simple_var_t(const string_t& key, var_store_t& store)
+        : var_base_t(key, store),
           value_()
     {}
 
