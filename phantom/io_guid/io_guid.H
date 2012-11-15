@@ -34,4 +34,3 @@ private:
 } // namespace phantom
 
 #pragma GCC visibility pop
-
