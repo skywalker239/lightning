@@ -19,11 +19,11 @@ void io_zclient_t::config_t::check(const in_t::ptr_t& p) const {
 
 io_zclient_t::io_zclient_t(const string_t& name, const config_t& config)
     : io_t(name, config),
-      zhandle_(*config.zhandle),
       next_(NULL),
       me_(NULL),
       todo_list_(NULL),
-      todo_last_(&todo_list_)
+      todo_last_(&todo_list_),
+      zhandle_(*config.zhandle)
 {}
 
 io_zclient_t::~io_zclient_t() {

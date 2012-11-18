@@ -59,12 +59,9 @@ public:
 
     io_zclient_t(const string_t& name, const config_t& config);
     ~io_zclient_t() throw();
-protected:
-    io_zhandle_t& zhandle_;
 
     //! Puts a new action on the queue.
     void schedule(todo_item_t* todo_item);
-    
 private:
     //! Registers this client with io_zhandle.
     //  DO NOT OVERRIDE.
@@ -93,6 +90,8 @@ private:
     todo_item_t* todo_list_;
     todo_item_t** todo_last_;
     bq_cond_t todo_cond_;
+
+    io_zhandle_t& zhandle_;
 
     friend class io_zhandle_t;
     friend class todo_item_t;
