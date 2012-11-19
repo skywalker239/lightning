@@ -35,15 +35,8 @@ io_zhandle_t::~io_zhandle_t() {
     assert(clients_ == NULL);
 }
 
-void io_zhandle_t::lock() {
-    connected_cond_.lock();
-}
-
-void io_zhandle_t::unlock() {
-    connected_cond_.unlock();
-}
-
 zhandle_t* io_zhandle_t::wait() {
+    bq_cond_guard_t guard(connected_cond_);
     if(!connected_) {
         if(!bq_success(connected_cond_.wait(NULL))) {
             throw exception_sys_t(log::error, errno, "connected_cond.wait: %m");

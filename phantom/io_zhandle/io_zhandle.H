@@ -8,6 +8,8 @@
 
 #include <pd/bq/bq_cond.H>
 
+#include <pd/zookeeper/zhandle_holder.H>
+
 #include <stdio.h>
 
 #include <zookeeper/zookeeper.h>
@@ -23,23 +25,9 @@ class io_zclient_t;
 //  Manages the session state:
 //    * Tries to reconnect upon connection loss
 //    * Notifies clients about ZK session expiration.
-//
-//  Provides a condition variable-like interface to clients.
-//  Typical usage is:
-//
-//  io_zhandle.lock();
-//  zhandle_t* zhandle = io_zhandle.wait(); // blocks if no current session
-//  io_zhandle.unlock();
-//  // (do something useful using zhandle)
-//
-//  or, using RAII guard semantics
-//
-//  {
-//    zhandle_guard_t guard(io_zhandle);
-//    zhandle_t* zhandle = io_zhandle.wait();
-//    // (do something useful using zhandle)
-//  }
-class io_zhandle_t : public io_t {
+class io_zhandle_t : public io_t,
+                     public zhandle_holder_t
+{
 public:
     struct config_t : public io_t::config_t {
         //! ZK hosts string, host:port, comma separated.
@@ -63,15 +51,7 @@ public:
     //! If there is a valid open Zookeeper session, returns its zhandle
     //  immediately.
     //  Otherwise blocks until a session is established.
-    //
-    //  Must be called with lock() held.
-    zhandle_t* wait();
-    
-    //! Locks the internal condition variable.
-    void lock();
-
-    //! Unlocks the internal condition variable.
-    void unlock();
+    virtual zhandle_t* wait();
 
     //! Clients must register themselves with io_zhandle
     //  to be notified of ZK session expirations
@@ -129,9 +109,6 @@ private:
     io_zclient_t* clients_;
     thr::spinlock_t clients_lock_;
 };
-
-//! RAII guard for io_zhandle_t.
-typedef thr::guard_t<io_zhandle_t> zhandle_guard_t;
 
 }  // namespace phantom
 

@@ -11,8 +11,12 @@ namespace phantom {
 
 //! An abstract base class for phantom objects that want to access Zookeeper.
 //
-//  Holds a reference to an io_zhandle_t and processes a queue of actions
-//  that do something with a Zookeeper session handle.
+//  Holds a reference to an io_zhandle_t available for descendants to
+//  work with.
+//
+//  Also processes a queue of actions that do something with a Zookeeper
+//  handle. This is needed to transfer execution from a Zookeeper thread
+//  (e.g. a watch callback) to a thread managed by phantom.
 //
 //  The actions are to be defined in descendant classes as descendants of
 //  todo_item_t (see below).
@@ -41,14 +45,10 @@ public:
         //   (called by the zclient that it is attached to).
         void detach() throw();
 
-        //! Applies this action, using zhandle as the
-        //  current Zookeeper session handle.
+        //! Applies this action, providing it with a
+        //  Zookeeper handle.
         //  (called by the zclient that has just detached this item)
-        //
-        //  Returns false if zclient must try to reapply it
-        //  (e.g. if zhandle has gone invalid by the time apply()
-        //  started executing).
-        virtual bool apply(zhandle_t* zhandle) = 0;
+        virtual void apply(zhandle_holder_t& zhandle_holder) = 0;
     private:
         io_zclient_t* zclient_;
         todo_item_t* next_;
@@ -62,6 +62,9 @@ public:
 
     //! Puts a new action on the queue.
     void schedule(todo_item_t* todo_item);
+protected:
+    //! The zhandle provider.
+    io_zhandle_t& io_zhandle_;
 private:
     //! Registers this client with io_zhandle.
     //  DO NOT OVERRIDE.
@@ -76,8 +79,6 @@ private:
 
     todo_item_t* next_todo();
 
-    zhandle_t*   get_zhandle();
-
     //! Handles Zookeeper session reestablishment.
     //  (resets watches etc)
     //  This function completely blocks io_zhandle,
@@ -86,12 +87,10 @@ private:
 
     io_zclient_t* next_;
     io_zclient_t** me_;
-    
+
     todo_item_t* todo_list_;
     todo_item_t** todo_last_;
     bq_cond_t todo_cond_;
-
-    io_zhandle_t& zhandle_;
 
     friend class io_zhandle_t;
     friend class todo_item_t;

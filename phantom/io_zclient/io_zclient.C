@@ -19,11 +19,11 @@ void io_zclient_t::config_t::check(const in_t::ptr_t& p) const {
 
 io_zclient_t::io_zclient_t(const string_t& name, const config_t& config)
     : io_t(name, config),
+      io_zhandle_(*config.zhandle),
       next_(NULL),
       me_(NULL),
       todo_list_(NULL),
-      todo_last_(&todo_list_),
-      zhandle_(*config.zhandle)
+      todo_last_(&todo_list_)
 {}
 
 io_zclient_t::~io_zclient_t() {
@@ -34,11 +34,11 @@ io_zclient_t::~io_zclient_t() {
 }
 
 void io_zclient_t::init() {
-    zhandle_.register_client(this);
+    io_zhandle_.register_client(this);
 }
 
 void io_zclient_t::fini() {
-    zhandle_.deregister_client(this);
+    io_zhandle_.deregister_client(this);
 }
 
 io_zclient_t::todo_item_t* io_zclient_t::next_todo() {
@@ -56,23 +56,14 @@ io_zclient_t::todo_item_t* io_zclient_t::next_todo() {
     return todo;
 }
 
-zhandle_t* io_zclient_t::get_zhandle() {
-    zhandle_guard_t zguard(zhandle_);
-    return zhandle_.wait();
-}
-
 void io_zclient_t::run() {
     while(true) {
         todo_item_t* todo = next_todo();
-        zhandle_t* zhandle = NULL;
-        do {
-            zhandle = get_zhandle();
-            log_debug(
-                "io_zclient(%p) released todo_cond, got todo %p, zhandle %p",
-                this,
-                todo,
-                zhandle);
-        } while(!todo->apply(zhandle));
+        todo->apply(io_zhandle_);
+        log_debug(
+            "io_zclient(%p) released todo_cond, got todo %p",
+            this,
+            todo);
         delete todo;
     }
 }
