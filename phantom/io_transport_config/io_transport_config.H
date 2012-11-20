@@ -57,6 +57,17 @@ public:
         return ring_port_;
     }
 
+    //! Queue size in ring sender
+    inline simple_var_t<size_t> ring_sender_queue_size() const {
+        return ring_sender_queue_size_;
+    }
+
+    //! Number of connections ring_sender_t opens to next instance in
+    //! the ring
+    inline simple_var_t<size_t> ring_sender_number_of_connections() const {
+        return ring_sender_number_of_connections_;
+    }
+
     //! The recovery port for this instance.
     inline simple_var_t<uint16_t> recovery_port() const {
         return recovery_port_;
@@ -117,6 +128,8 @@ private:
     simple_var_t<address_ipv4_t> multicast_group_;
     simple_var_t<uint16_t> multicast_port_;
     simple_var_t<uint16_t> ring_port_;
+    simple_var_t<size_t> ring_sender_queue_size_;
+    simple_var_t<size_t> ring_sender_number_of_connections_;
     simple_var_t<uint16_t> recovery_port_;
     simple_var_t<uint16_t> client_port_;
 

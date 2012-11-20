@@ -76,8 +76,8 @@ public:
         thr::spinlock_t lock;
         item_t *list;
     
-        slot_t() throw();
-        ~slot_t() throw();
+        slot_t() throw() {};
+        ~slot_t() throw() {};
     };
 
     //! Looks up the data_t corresponding to request id `id'.
