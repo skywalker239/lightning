@@ -73,6 +73,15 @@ wait_pool_t::wait_pool_t(size_t slots)
 wait_pool_t::~wait_pool_t()
 {}
 
+wait_pool_t::slot_t::slot_t()
+    : lock(),
+      list(NULL)
+{}
+
+wait_pool_t::slot_t::~slot_t() {
+    assert(list == NULL);
+}
+
 wait_pool_t::slot_t& wait_pool_t::slot(request_id_t request_id) {
     fnv_t hasher;
     char* p = (char*)&request_id;
