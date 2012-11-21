@@ -9,8 +9,8 @@
 
 namespace phantom {
 
-void ring_link_t::loop(ref_t<ring_link_t>* me) {
-    ref_t<ring_link_t> no_delete_till_alive = *me;
+void ring_link_t::loop(const ref_t<ring_link_t>& me) {
+    ref_t<ring_link_t> no_delete_till_alive = me;
 
     while(true) {
         if(is_stopped()) break;
@@ -32,8 +32,6 @@ void ring_link_t::loop(ref_t<ring_link_t>* me) {
 
         bq_conn_fd_t conn(fd, NULL, log::warning);
 
-        if(is_stopped()) break;
-
         try {
             send_loop(conn);
         } catch (const exception_sys_t& exception) {
@@ -50,17 +48,18 @@ void ring_link_t::send_loop(bq_conn_t& conn) {
 	bq_out_t out(conn, obuf, sizeof(obuf), net_timeout_);
 
     while(true) {
-        ref_t<pi_ext_t> blob;
-        queue_->pop(&blob);
-
         if(is_stopped()) {
-            queue_->push(blob);
             break;
         }
 
-        pi_t::print_app(out, &blob->root());
-        out.flush_all();
-        out.timeout_reset();
+        ref_t<pi_ext_t> blob;
+        interval_t timeout = net_timeout_;
+
+        if (queue_->pop(&blob, &timeout)) {
+            pi_t::print_app(out, &blob->root());
+            out.flush_all();
+            out.timeout_reset();
+        }
     }
 }
 

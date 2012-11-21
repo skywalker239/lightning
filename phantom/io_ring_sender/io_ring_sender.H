@@ -1,12 +1,16 @@
 #pragma once
 
-#include <phantom/io.H>
-#include <phantom/io_transport_config/io_transport_config.H>
+#include <vector>
 
 #include <pd/base/ref.H>
 #include <pd/base/queue.H>
 #include <pd/base/netaddr.H>
 #include <pd/lightning/pi_ext.H>
+#include <pd/lightning/blocking_queue.H>
+
+#include <phantom/io.H>
+#include <phantom/io_transport_config/io_transport_config.H>
+#include <phantom/io_ring_sender/ring_link.H>
 
 #pragma GCC visibitily push(default)
 
@@ -26,7 +30,7 @@ public:
     io_ring_sender_t(const string_t& name, const config_t& config);
     ~io_ring_sender_t() throw();
 
-    void send_to_ring(ref_t<pi_ext_t> blob);
+    void send_to_ring(const ref_t<pi_ext_t>& blob);
 
     virtual void init();
     virtual void run();
@@ -35,6 +39,18 @@ public:
 private:
     uint32_t host_id_;
     io_transport_config_t& transport_config_;
+
+    blocking_queue_t<ref_t<pi_ext_t>>* queue_;
+
+    std::vector<ref_t<ring_link_t>> active_links_;
+
+    size_t number_of_connections_;
+    interval_t net_timeout_;
+    size_t obuf_size_;
+
+    void shutdown_links();
+
+    void start_links(const ring_var_t& ring);
 };
 
 }

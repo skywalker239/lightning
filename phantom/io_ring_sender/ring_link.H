@@ -10,7 +10,6 @@
 #include <pd/lightning/blocking_queue.H>
 
 #include <phantom/pd.H>
-#include <phantom/io_ring_sender/io_ring_sender.H>
 
 namespace phantom {
 
@@ -26,7 +25,7 @@ public:
           obuf_size_(obuf_size),
           shutdown_(false) {};
 
-    void loop(ref_t<ring_link_t>* me);
+    void loop(const ref_t<ring_link_t>& me);
 
     void shutdown();
 

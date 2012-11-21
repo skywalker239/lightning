@@ -68,6 +68,7 @@ private:
         test_blocking_queue_simple();
         test_blocking_queue_timeout();
         test_blocking_queue_concurrent();
+        test_blocking_queue_deactivation();
         log_info("Finished testing blocking_queue_t");
     }
 
@@ -192,9 +193,27 @@ private:
             timeout = interval_millisecond;
             int value;
             if (queue->pop(&value, &timeout)) {
-                (*poped_elements)[value] = 1;
+                (*poped_elements)[value] += 1;
             }
         }
+    }
+
+    void test_blocking_queue_deactivation() {
+        blocking_queue_t<int> queue(1);
+        
+        ASSERT(queue.push(0));
+
+        queue.deactivate();
+
+        queue.activate();
+
+        int value;
+        ASSERT(queue.pop(&value));
+
+        queue.deactivate();
+
+        ASSERT(!queue.pop(&value));
+        ASSERT(!queue.push(1));
     }
 };
 
