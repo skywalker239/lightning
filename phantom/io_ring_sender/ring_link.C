@@ -53,9 +53,7 @@ void ring_link_t::send_loop(bq_conn_t& conn) {
         }
 
         ref_t<pi_ext_t> blob;
-        interval_t timeout = net_timeout_;
-
-        if (queue_->pop(&blob, &timeout)) {
+        if (queue_->pop(&blob)) {
             pi_t::print_app(out, &blob->root());
             out.flush_all();
             out.timeout_reset();
