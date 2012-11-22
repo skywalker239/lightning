@@ -1,3 +1,7 @@
+// Copyright (C) 2012, Alexey Pervushin <billyevans@yandex-team.ru>
+// Copyright (C) 2012, YANDEX LLC.
+// This code may be distributed under the terms of the GNU GPL v3.
+// See ‘http://www.gnu.org/licenses/gpl.html’.
 // vim: set tabstop=4 expandtab:
 #include "io_guid.H"
 
