@@ -45,8 +45,8 @@ private:
     std::vector<ref_t<ring_link_t>> active_links_;
 
     size_t number_of_connections_;
-    interval_t net_timeout_;
     size_t obuf_size_;
+    interval_t net_timeout_;
 
     void shutdown_links();
 

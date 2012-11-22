@@ -68,6 +68,17 @@ public:
         return ring_sender_number_of_connections_;
     }
 
+    //! Size of output buffer in each connection
+    inline simple_var_t<size_t> ring_sender_output_buffer_size() const {
+        return ring_sender_output_buffer_size_;
+    }
+
+    //! Timeout after which ring_link_t restarts connection or stops
+    inline simple_var_t<interval_t> ring_sender_net_timeout() const {
+        return ring_sender_net_timeout_;
+    }
+
+
     //! The recovery port for this instance.
     inline simple_var_t<uint16_t> recovery_port() const {
         return recovery_port_;
@@ -130,6 +141,8 @@ private:
     simple_var_t<uint16_t> ring_port_;
     simple_var_t<size_t> ring_sender_queue_size_;
     simple_var_t<size_t> ring_sender_number_of_connections_;
+    simple_var_t<size_t> ring_sender_output_buffer_size_;
+    simple_var_t<interval_t> ring_sender_net_timeout_;
     simple_var_t<uint16_t> recovery_port_;
     simple_var_t<uint16_t> client_port_;
 

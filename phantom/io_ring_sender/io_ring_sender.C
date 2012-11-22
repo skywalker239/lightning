@@ -40,6 +40,16 @@ void io_ring_sender_t::init() {
         transport_config_.ring_sender_number_of_connections();
     number_of_connections.update();
     number_of_connections_ = number_of_connections.value();
+
+    simple_var_t<size_t> output_buffer_size =
+        transport_config_.ring_sender_output_buffer_size();
+    output_buffer_size.update();
+    obuf_size_ = output_buffer_size.value();
+
+    simple_var_t<interval_t> net_timeout =
+        transport_config_.ring_sender_net_timeout();
+    net_timeout.update();
+    net_timeout_ = net_timeout.value();
 }
 
 void io_ring_sender_t::run() {
