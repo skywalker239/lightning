@@ -1,11 +1,11 @@
-// Copyright (C) 2012, Alexander Kharitonov <alexander.kharitonov@gmail.com>
-// Copyright (C) 2012, YANDEX LLC.
-// This code may be distributed under the terms of the GNU GPL v3.
-// See ‘http://www.gnu.org/licenses/gpl.html’.
-// vim: set tabstop=4 expandtab:
 #pragma once
 
-#include <pd/lightning/defs.H>
+#include <vector>
+#include <queue>
+#include <algorithm>
+
+#include "pd/lightning/defs.H"
+#include "pd/bq/bq_cond.H"
 
 namespace pd {
 
@@ -17,7 +17,12 @@ public:
     //! open_instances_limit is the maximum number of open instances
     //  that we keep without blocking adding new ones.
     instance_pool_t(size_t open_instances_limit,
-                    size_t reserved_instances_limit);
+                    size_t reserved_instances_limit) : 
+        open_instances_limit_(open_instances_limit),
+        reserved_instances_limit_(reserved_instances_limit),
+        open_instances_(),
+        reserved_instances_()
+    {}
 
     //! Adds a new open instance id.
     //  Blocks if the open instance pool is full OR the
@@ -30,11 +35,26 @@ public:
 
     //! Returns the minimal open instance id from the pool.
     //  Blocks if the open pool is empty.
-    void pop_open_instance();
+    instance_id_t pop_open_instance();
 
     //! Returns the minimal reserved instance id from the pool.
     //  Blocks if the reserved pool is empty.
-    void pop_reserved_instance();
+    instance_id_t pop_reserved_instance();
+
+private:
+    size_t open_instances_limit_;
+    size_t reserved_instances_limit_;
+
+    typedef std::priority_queue<instance_id_t, 
+                                std::vector<instance_id_t>,
+                                std::greater<size_t> > instance_heap;
+    instance_heap open_instances_;
+    instance_heap reserved_instances_;
+
+    bq_cond_t open_instances_not_empty_;
+    bq_cond_t open_instances_not_full_;
+    bq_cond_t reserved_instances_not_empty_;
+    bq_cond_t reserved_instances_not_full_;
 };
 
 }  // namespace pd
