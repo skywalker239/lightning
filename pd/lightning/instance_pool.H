@@ -51,10 +51,8 @@ private:
     instance_heap open_instances_;
     instance_heap reserved_instances_;
 
-    bq_cond_t open_instances_not_empty_;
-    bq_cond_t open_instances_not_full_;
-    bq_cond_t reserved_instances_not_empty_;
-    bq_cond_t reserved_instances_not_full_;
+    bq_cond_t open_instances_cond_;
+    bq_cond_t reserved_instances_cond_;
 };
 
 }  // namespace pd
