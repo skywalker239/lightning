@@ -15,8 +15,6 @@
 #include <pd/bq/bq_cond.H>
 #include <pd/lightning/blocking_queue.H>
 
-#pragma GCC visibility push(default)
-
 namespace phantom {
 
 MODULE(io_pd_lightning_test);
@@ -127,26 +125,36 @@ private:
 
         for (int pusher = 0; pusher < N_PUSHERS; ++pusher) {
             bq_job_t<typeof(&io_pd_lightning_test_t::test_blocking_queue_pusher)>::create(
-                STRING("test_blocking_queue_pusher"), bq_thr_get(), *this,
+                STRING("test_blocking_queue_pusher"),
+                bq_thr_get(),
+                *this,
                 &io_pd_lightning_test_t::test_blocking_queue_pusher,
-                &queue, N_WRITES * pusher, N_WRITES * (pusher + 1),
-                &pushers_finished, &pusher_finished_cond);
+                &queue,
+                N_WRITES * pusher,
+                N_WRITES * (pusher + 1),
+                &pushers_finished,
+                &pusher_finished_cond);
         }
 
         for (int reader = 0; reader < N_READERS; ++reader) {
             bq_job_t<typeof(&io_pd_lightning_test_t::test_blocking_queue_reader)>::create(
-                STRING("test_blocking_queue_reader"), bq_thr_get(), *this,
+                STRING("test_blocking_queue_reader"),
+                bq_thr_get(),
+                *this,
                 &io_pd_lightning_test_t::test_blocking_queue_reader,
-                &queue, &stop_readers, &readers_stopped,
-                &poped_elements, &readers_stop_cond);
+                &queue,
+                &stop_readers,
+                &readers_stopped,
+                &poped_elements,
+                &readers_stop_cond);
         }
 
-        bq_cond_guard_t guard1(pusher_finished_cond);
+        bq_cond_guard_t pusher_guard(pusher_finished_cond);
         while(pushers_finished != N_PUSHERS) {
             pusher_finished_cond.wait(NULL);
         }
 
-        bq_cond_guard_t guard2(readers_stop_cond);
+        bq_cond_guard_t readers_guard(readers_stop_cond);
         stop_readers = true;
         while(readers_stopped != N_READERS) {
             readers_stop_cond.wait(NULL);
@@ -162,7 +170,8 @@ private:
     }
 
     void test_blocking_queue_pusher(blocking_queue_t<int>* queue,
-                                    int start, int end,
+                                    int start,
+                                    int end,
                                     int* finished,
                                     bq_cond_t* finished_cond) {
         for (int i = start; i < end; ++i) {
@@ -176,7 +185,8 @@ private:
     }
 
     void test_blocking_queue_reader(blocking_queue_t<int>* queue,
-                                    bool* stop, int* readers_stopped,
+                                    bool* stop,
+                                    int* readers_stopped,
                                     std::vector<int>* poped_elements,
                                     bq_cond_t* stop_cond) {
         interval_t timeout;
@@ -227,5 +237,3 @@ config_binding_ctor(io_t, io_pd_lightning_test_t);
 
 
 } // namespace phantom
-
-#pragma GCC visibility pop

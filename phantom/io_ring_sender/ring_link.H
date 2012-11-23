@@ -13,8 +13,23 @@
 
 namespace phantom {
 
+
+/**
+ * Single connection to next acceptor in the ring.
+ *
+ * Takes blobs one by one from queue and sends them to next acceptor.
+ * Restarts connection if send operation didn't succeeded in
+ * net_timeout.
+ */
 class ring_link_t : ref_count_atomic_t {
 public:
+    //! @param queue - ptr to queue from which link takes blobs to
+    //! send
+    //! @param next_in_the_ring - network address of next acceptor
+    //! @param net_timeout - timeout after which connection is
+    //! considered broken and restarted 
+    //! @param obuf_size - size of buffer allocated on stack and used
+    //! internally by bq_out_t(in bytes)
     ring_link_t(blocking_queue_t<ref_t<pi_ext_t>>* queue,
                 netaddr_ipv4_t next_in_the_ring,
                 interval_t net_timeout,
@@ -25,8 +40,17 @@ public:
           obuf_size_(obuf_size),
           shutdown_(false) {};
 
-    void loop(const ref_t<ring_link_t>& me);
+    //! Main loop of link, all work is done here.
+    //! Takes ref_t to itself to simplify destruction of stopped
+    //! links(just shutdown link, delete reference to it and link will
+    //! destroy itself after return from this function).
+    //!
+    //! Returns after shutdown() is called
+    void loop(ref_t<ring_link_t> me);
 
+    //! Shutdown this link.
+    //! Link might stay blocked on queue, call queue.deactivate() to
+    //! ensure that link is fully stopped.
     void shutdown();
 
 private:
@@ -39,7 +63,8 @@ private:
 
     bool is_stopped();
 
-    void send_loop(bq_conn_t& conn);
+    //! Loop that takes blobs from queue and send then over network.
+    void send_loop(bq_conn_t* conn);
 
     friend class ref_t<ring_link_t>;
 };

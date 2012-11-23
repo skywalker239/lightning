@@ -9,12 +9,9 @@
 
 namespace phantom {
 
-void ring_link_t::loop(const ref_t<ring_link_t>& me) {
-    ref_t<ring_link_t> no_delete_till_alive = me;
-
-    while(true) {
-        if(is_stopped()) break;
-
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+void ring_link_t::loop(ref_t<ring_link_t> me) {
+    while(!is_stopped()) {
         int fd = socket(next_in_the_ring_.sa->sa_family, SOCK_STREAM, 0);
         if(fd < 0) {
             throw exception_sys_t(log::error, errno, "socket: %m");
@@ -24,8 +21,10 @@ void ring_link_t::loop(const ref_t<ring_link_t>& me) {
         bq_fd_setup(fd);
 
         interval_t connect_timeout = net_timeout_;
-        if(bq_connect(fd, next_in_the_ring_.sa,
-                      next_in_the_ring_.sa_len, &connect_timeout) < 0) {
+        if(bq_connect(fd,
+                      next_in_the_ring_.sa,
+                      next_in_the_ring_.sa_len,
+                      &connect_timeout) < 0) {
             log_warning("bq_connect: %m");
             continue;
         }
@@ -33,7 +32,7 @@ void ring_link_t::loop(const ref_t<ring_link_t>& me) {
         bq_conn_fd_t conn(fd, NULL, log::warning);
 
         try {
-            send_loop(conn);
+            send_loop(&conn);
         } catch (const exception_sys_t& exception) {
             exception.log();
             if (exception.errno_val == ECANCELED) {
@@ -42,16 +41,13 @@ void ring_link_t::loop(const ref_t<ring_link_t>& me) {
         }
     }
 }
+#pragma GCC diagnostic pop
 
-void ring_link_t::send_loop(bq_conn_t& conn) {
+void ring_link_t::send_loop(bq_conn_t* conn) {
     char obuf[obuf_size_];
-	bq_out_t out(conn, obuf, sizeof(obuf), net_timeout_);
+    bq_out_t out(*conn, obuf, sizeof(obuf), net_timeout_);
 
-    while(true) {
-        if(is_stopped()) {
-            break;
-        }
-
+    while(!is_stopped()) {
         ref_t<pi_ext_t> blob;
         if (queue_->pop(&blob)) {
             pi_t::print_app(out, &blob->root());

@@ -14,9 +14,8 @@ void io_ring_sender_t::config_t::check(const in_t::ptr_t& p) const {
         config::error(p, "io_ring_sender_t.transport_config must be set");
     }
 
-    if(!host_id) {
+    if(host_id == ring_var_t::kInvalidHostId) {
         config::error(p, "io_ring_sender_t.host_id must be set");
-
     }
 }
 
@@ -26,9 +25,7 @@ io_ring_sender_t::io_ring_sender_t(const string_t& name, const config_t& config)
       transport_config_(*config.transport_config),
       queue_(NULL) {}
 
-io_ring_sender_t::~io_ring_sender_t() {
-    delete queue_;
-}
+io_ring_sender_t::~io_ring_sender_t() {}
 
 void io_ring_sender_t::init() {
     simple_var_t<size_t> queue_size = transport_config_.ring_sender_queue_size();
@@ -77,12 +74,13 @@ void io_ring_sender_t::run() {
 }
 
 void io_ring_sender_t::fini() {
-    active_links_.resize(0);
-    queue_->deactivate();
-    queue_->clear();
+    active_links_.clear();
+
+    delete queue_;
+    queue_ = NULL;
 }
 
-void io_ring_sender_t::send_to_ring(const ref_t<pi_ext_t>& blob) {
+void io_ring_sender_t::send(const ref_t<pi_ext_t>& blob) {
     queue_->push(blob);
 }
 
@@ -95,8 +93,10 @@ void io_ring_sender_t::start_links(const ring_var_t& ring) {
             new ring_link_t(queue_, next_in_the_ring, net_timeout_, obuf_size_)));
 
         bq_job_t<typeof(&ring_link_t::loop)>::create(
-            STRING("ring_link_t"), bq_thr_get(),
-            *active_links_.back(), &ring_link_t::loop,
+            STRING("ring_link_t"),
+            bq_thr_get(),
+            *active_links_.back(),
+            &ring_link_t::loop,
             active_links_.back()
         );
     }
@@ -107,7 +107,7 @@ void io_ring_sender_t::shutdown_links() {
         link->shutdown();
     }
 
-    active_links_.resize(0);
+    active_links_.clear();
 }
 
 namespace io_ring_sender {

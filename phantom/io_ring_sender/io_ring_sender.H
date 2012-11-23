@@ -16,13 +16,22 @@
 
 namespace phantom {
 
+/**
+ * Sends blobs to next acceptor in the ring.
+ *
+ * Maintains several TCP connections to next acceptor. Shuts them down
+ * and starts new when zookeeper ring variable changes.
+ * 
+ * When ring changes or TCP connection breaks some blobs might be lost
+ * or sent to wrong acceptor.
+ */
 class io_ring_sender_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
         uint32_t host_id;
         config::objptr_t<io_transport_config_t> transport_config;
 
-        config_t() throw() {}
+        config_t() throw() : host_id(ring_var_t::kInvalidHostId) {}
         ~config_t() throw() {}
         void check(const in_t::ptr_t& p) const;
     };
@@ -30,7 +39,12 @@ public:
     io_ring_sender_t(const string_t& name, const config_t& config);
     ~io_ring_sender_t() throw();
 
-    void send_to_ring(const ref_t<pi_ext_t>& blob);
+    //! Send blob to next acceptor
+    //! 
+    //! Blocks if internal queue is full.
+    //!
+    //! Return immediately and discard blob if current acceptor is not in the ring.
+    void send(const ref_t<pi_ext_t>& blob);
 
     virtual void init();
     virtual void run();
