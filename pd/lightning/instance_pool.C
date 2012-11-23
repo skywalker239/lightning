@@ -45,9 +45,9 @@ instance_id_t instance_pool_t::pop_reserved_instance() {
 
     instance_id_t iid = reserved_instances_.top();
     reserved_instances_.pop();
-    open_instances_cond_.send(true);
+    reserved_instances_cond_.send(true);
 
     return iid;
 }
 
-} // nmaespace pd
+} // namespace pd
