@@ -2,7 +2,7 @@
 
 namespace pd {
 void instance_pool_t::push_open_instance(instance_id_t iid) {
-	bq_cond_guard_t guard(open_instances_cond_);
+    bq_cond_guard_t guard(open_instances_cond_);
 
     while (open_instances_.size() >= open_instances_limit_) {
         open_instances_cond_.wait(NULL);    
@@ -13,9 +13,9 @@ void instance_pool_t::push_open_instance(instance_id_t iid) {
 }
 
 instance_id_t instance_pool_t::pop_open_instance() {
-	bq_cond_guard_t guard(open_instances_cond_);
+    bq_cond_guard_t guard(open_instances_cond_);
 
-	while (open_instances_.size() == 0) {
+    while (open_instances_.size() == 0) {
         open_instances_cond_.wait(NULL);
     }
 
@@ -26,9 +26,9 @@ instance_id_t instance_pool_t::pop_open_instance() {
 }
 
 void instance_pool_t::push_reserved_instance(instance_id_t iid) {
-	bq_cond_guard_t guard(reserved_instances_cond_);
+    bq_cond_guard_t guard(reserved_instances_cond_);
 
-	while (reserved_instances_.size() >= reserved_instances_limit_) {
+    while (reserved_instances_.size() >= reserved_instances_limit_) {
         reserved_instances_cond_.wait(NULL);
     }
 
@@ -37,10 +37,10 @@ void instance_pool_t::push_reserved_instance(instance_id_t iid) {
 }
 
 instance_id_t instance_pool_t::pop_reserved_instance() {
-	bq_cond_guard_t guard(reserved_instances_cond_);
+    bq_cond_guard_t guard(reserved_instances_cond_);
 
-	while (reserved_instances_.size() == 0) {
-        reserved_instances_not_empty_.wait(NULL);
+    while (reserved_instances_.size() == 0) {
+        reserved_instances_cond_.wait(NULL);
     }
 
     instance_id_t iid = reserved_instances_.top();
