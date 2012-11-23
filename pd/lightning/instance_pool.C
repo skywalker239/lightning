@@ -9,7 +9,7 @@ void instance_pool_t::push_open_instance(instance_id_t iid) {
     }
 
     open_instances_.push(iid);
-    open_instances_cond_.send();
+    open_instances_cond_.send(true);
 }
 
 instance_id_t instance_pool_t::pop_open_instance() {
@@ -21,7 +21,7 @@ instance_id_t instance_pool_t::pop_open_instance() {
 
     instance_id_t iid = open_instances_.top();
     open_instances_.pop();
-    open_instances_cond_.send();
+    open_instances_cond_.send(true);
     return iid;
 }
 
@@ -33,7 +33,7 @@ void instance_pool_t::push_reserved_instance(instance_id_t iid) {
     }
 
     reserved_instances_.push(iid);
-    reserved_instances_cond_.send();
+    reserved_instances_cond_.send(true);
 }
 
 instance_id_t instance_pool_t::pop_reserved_instance() {
@@ -45,7 +45,8 @@ instance_id_t instance_pool_t::pop_reserved_instance() {
 
     instance_id_t iid = reserved_instances_.top();
     reserved_instances_.pop();
-    open_instances_cond_.send();
+    open_instances_cond_.send(true);
+
     return iid;
 }
 
