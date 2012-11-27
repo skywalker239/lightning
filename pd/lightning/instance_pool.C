@@ -8,17 +8,17 @@
 
 namespace pd {
 instance_pool_t::instance_pool_t(size_t open_instances_limit,
-                    		size_t reserved_instances_limit)
-		 : open_instances_limit_(open_instances_limit),
-        	reserved_instances_limit_(reserved_instances_limit),
-        	open_instances_(),
-        	reserved_instances_() {}
+                                 size_t reserved_instances_limit)
+         : open_instances_limit_(open_instances_limit),
+           reserved_instances_limit_(reserved_instances_limit),
+           open_instances_(),
+           reserved_instances_() {}
 
 void instance_pool_t::push_open_instance(instance_id_t iid) {
     bq_cond_guard_t guard(instance_cond_);
 
     while (open_instances_.size() >= open_instances_limit_ ||
-  	   reserved_instances_.size() >= reserved_instances_limit_) {
+           reserved_instances_.size() >= reserved_instances_limit_) {
         instance_cond_.wait(NULL);    
     }
 
@@ -60,7 +60,6 @@ instance_id_t instance_pool_t::pop_reserved_instance() {
     instance_id_t iid = reserved_instances_.top();
     reserved_instances_.pop();
     instance_cond_.send(true);
-
     return iid;
 }
 
