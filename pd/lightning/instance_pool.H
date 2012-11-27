@@ -1,3 +1,9 @@
+// Copyright (C) 2012, Alexander Kharitonov <alexander.kharitonov@gmail.com>
+// Copyright (C) 2012, YANDEX LLC.
+// This code may be distributed under the terms of the GNU GPL v4.
+// See ‘http://www.gnu.org/licenses/gpl.html’.
+// vim: set tabstop=4 expandtab:
+
 #pragma once
 
 #include <vector>
@@ -17,12 +23,7 @@ public:
     //! open_instances_limit is the maximum number of open instances
     //  that we keep without blocking adding new ones.
     instance_pool_t(size_t open_instances_limit,
-                    size_t reserved_instances_limit) : 
-        open_instances_limit_(open_instances_limit),
-        reserved_instances_limit_(reserved_instances_limit),
-        open_instances_(),
-        reserved_instances_()
-    {}
+                    size_t reserved_instances_limit);
 
     //! Adds a new open instance id.
     //  Blocks if the open instance pool is full OR the
@@ -47,12 +48,11 @@ private:
 
     typedef std::priority_queue<instance_id_t, 
                                 std::vector<instance_id_t>,
-                                std::greater<size_t> > instance_heap_t;
+                                std::greater<instance_id_t> > instance_heap_t;
     instance_heap_t open_instances_;
     instance_heap_t reserved_instances_;
 
-    bq_cond_t open_instances_cond_;
-    bq_cond_t reserved_instances_cond_;
+    bq_cond_t instance_cond_;
 };
 
 }  // namespace pd
