@@ -17,6 +17,11 @@ $(eval $(call MODULE,io_zconf,,pi lightning,))
 $(eval $(call MODULE,io_zmaster,,lightning,))
 $(eval $(call MODULE,io_transport_config,,pi lightning,))
 $(eval $(call MODULE,io_guid,,lightning,))
+$(eval $(call MODULE,io_ring_sender,,pi lightning zookeeper,))
+
+
+# test modules
+$(eval $(call MODULE,io_pd_lightning_test,,pi lightning,))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude
 
