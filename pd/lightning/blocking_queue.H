@@ -62,7 +62,9 @@ public:
                     }
                 }
 
+                not_full_guard.relax();
                 guard.wakeup();
+                not_full_guard.wakeup();
             }
         }
 
@@ -102,7 +104,9 @@ public:
                     }
                 }
 
+                not_empty_guard.relax();
                 guard.wakeup();
+                not_empty_guard.wakeup();
             }
         }
 
@@ -134,6 +138,7 @@ public:
 
         if(is_active_) {
             is_active_ = false;
+            guard.relax();
 
             bq_cond_guard_t not_empty_guard(not_empty_cond_);
             bq_cond_guard_t not_full_guard(not_full_cond_);
@@ -150,6 +155,7 @@ public:
         while(queue_.get_count() != 0) {
             queue_.remove();
         }
+        guard.relax();
 
         bq_cond_guard_t not_full_guard(not_full_cond_);
         not_full_cond_.send(true);
