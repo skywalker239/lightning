@@ -111,19 +111,20 @@ private:
     }
 
     void test_blocking_queue_concurrent() {
-        int QUEUE_SIZE = 10, N_READERS = 10, N_PUSHERS = 3, N_WRITES = 1000;
+        static const int QUEUE_SIZE = 10,
+                         N_READERS = 50, N_WRITERS = 50,
+        // per one reader / writer
+                         N_WRITES = 100000, N_READS = 100000;
+        ASSERT(N_READERS * N_READS == N_WRITERS * N_WRITES);
+
         blocking_queue_t<int> queue(QUEUE_SIZE);
 
-        int pushers_finished = 0;
-        bq_cond_t pusher_finished_cond;
-
-        bool stop_readers = false;
         int readers_stopped = 0;
         bq_cond_t readers_stop_cond;
 
-        std::vector<int> poped_elements(N_PUSHERS * N_WRITES, 0);
+        std::vector<int> poped_elements(N_WRITERS * N_WRITES, 0);
 
-        for (int pusher = 0; pusher < N_PUSHERS; ++pusher) {
+        for (int pusher = 0; pusher < N_WRITERS; ++pusher) {
             bq_job_t<typeof(&io_pd_lightning_test_t::test_blocking_queue_pusher)>::create(
                 STRING("test_blocking_queue_pusher"),
                 bq_thr_get(),
@@ -131,9 +132,7 @@ private:
                 &io_pd_lightning_test_t::test_blocking_queue_pusher,
                 &queue,
                 N_WRITES * pusher,
-                N_WRITES * (pusher + 1),
-                &pushers_finished,
-                &pusher_finished_cond);
+                N_WRITES * (pusher + 1));
         }
 
         for (int reader = 0; reader < N_READERS; ++reader) {
@@ -143,26 +142,20 @@ private:
                 *this,
                 &io_pd_lightning_test_t::test_blocking_queue_reader,
                 &queue,
-                &stop_readers,
-                &readers_stopped,
+                N_READS,
                 &poped_elements,
+                &readers_stopped,
                 &readers_stop_cond);
         }
 
-        bq_cond_guard_t pusher_guard(pusher_finished_cond);
-        while(pushers_finished != N_PUSHERS) {
-            pusher_finished_cond.wait(NULL);
-        }
-
         bq_cond_guard_t readers_guard(readers_stop_cond);
-        stop_readers = true;
         while(readers_stopped != N_READERS) {
             readers_stop_cond.wait(NULL);
         }
 
         bool fail = false;
         for (int element : poped_elements) {
-            if (element == 0) {
+            if (element != 1) {
                 fail = true;
             }
         }
@@ -171,40 +164,29 @@ private:
 
     void test_blocking_queue_pusher(blocking_queue_t<int>* queue,
                                     int start,
-                                    int end,
-                                    int* finished,
-                                    bq_cond_t* finished_cond) {
+                                    int end) {
         for (int i = start; i < end; ++i) {
             queue->push(i);
         }
-
-        bq_cond_guard_t guard(*finished_cond);
-        ++(*finished);
-        finished_cond->send();
     }
 
     void test_blocking_queue_reader(blocking_queue_t<int>* queue,
-                                    bool* stop,
-                                    int* readers_stopped,
+                                    int number_of_elements_to_read,
                                     std::vector<int>* poped_elements,
+                                    int* readers_stopped,
                                     bq_cond_t* stop_cond) {
-        interval_t timeout;
-        while (true) {
-            {
-                bq_cond_guard_t guard(*stop_cond);
-                if (*stop && queue->empty()) {
-                    ++(*readers_stopped);
-                    stop_cond->send();
-                    break;
-                }
-            }
+        for (int elements_read = 0;
+             elements_read < number_of_elements_to_read;
+             ++elements_read) {
 
-            timeout = interval_millisecond;
-            int value;
-            if (queue->pop(&value, &timeout)) {
-                (*poped_elements)[value] += 1;
-            }
+            int value = 0;
+            queue->pop(&value);
+            (*poped_elements)[value] += 1;
         }
+
+        bq_cond_guard_t stop_guard(*stop_cond);
+        ++(*readers_stopped);
+        stop_cond->send();
     }
 
     void test_blocking_queue_deactivation() {
