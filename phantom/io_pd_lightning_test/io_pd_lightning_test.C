@@ -111,10 +111,10 @@ private:
     }
 
     void test_blocking_queue_concurrent() {
-        static const int QUEUE_SIZE = 10,
+        static const int QUEUE_SIZE = 100,
                          N_READERS = 50, N_WRITERS = 50,
-        // per one reader / writer
-                         N_WRITES = 100000, N_READS = 100000;
+                         // per one reader / writer
+                         N_WRITES = 1000000, N_READS = 1000000;
         ASSERT(N_READERS * N_READS == N_WRITERS * N_WRITES);
 
         blocking_queue_t<int> queue(QUEUE_SIZE);

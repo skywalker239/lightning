@@ -3,6 +3,7 @@
 #include <pd/base/ref.H>
 #include <pd/base/queue.H>
 #include <pd/base/exception.H>
+#include <pd/base/thr.H>
 #include <pd/bq/bq_cond.H>
 
 namespace pd {
@@ -40,24 +41,35 @@ public:
     //!
     //! @throws exception_sys_t on phantom shutdown or other error.
     bool push(const x_t& value, interval_t* timeout = NULL) {
-        bq_cond_guard_t guard(queue_cond_);
+        thr::spinlock_guard_t guard(queue_lock_);
 
-        if (!is_active_) {
+        if(!is_active_) {
             return false;
         }
 
-        while(queue_.get_count() >= max_size_) {
-            if(!bq_success(queue_cond_.wait(timeout))) {
-                if(errno == ETIMEDOUT || !is_active_) {
-                    return false;
-                } else {
-                    throw exception_sys_t(log::error, errno, "blocking_queue_t.push: %m");
+        if(queue_.get_count() == max_size_) {
+            bq_cond_guard_t not_full_guard(not_full_cond_);
+            while(queue_.get_count() == max_size_) {
+                guard.relax();
+
+                if(!bq_success(not_full_cond_.wait(timeout))) {
+                    if(errno == ETIMEDOUT || !is_active_) {
+                        return false;
+                    } else {
+                        throw exception_sys_t(log::error,
+                                              errno,
+                                              "blocking_queue_t::push: %m");
+                    }
                 }
+
+                guard.wakeup();
             }
         }
 
         queue_.insert(value);
-        queue_cond_.send(true);
+
+        send_to_next();
+
         return true;
     }
 
@@ -69,37 +81,46 @@ public:
     //!
     //! @throws exception_sys_t on phantom shutdown or other error.
     bool pop(x_t* value, interval_t* timeout = NULL) {
-        bq_cond_guard_t guard(queue_cond_);
+        thr::spinlock_guard_t guard(queue_lock_);
 
-        if (!is_active_) {
+        if(!is_active_) {
             return false;
         }
 
-        while(queue_.get_count() == 0) {
-            if(!bq_success(queue_cond_.wait(timeout))) {
-                if(errno == ETIMEDOUT || !is_active_) {
-                    return false;
-                } else {
-                    throw exception_sys_t(log::error, errno, "blocking_queue_t.pop: %m");
+        if(queue_.get_count() == 0) {
+            bq_cond_guard_t not_empty_guard(not_empty_cond_);
+            while(queue_.get_count() == 0) {
+                guard.relax();
+
+                if(!bq_success(not_empty_cond_.wait(timeout))) {
+                    if(errno == ETIMEDOUT || !is_active_) {
+                        return false;
+                    } else {
+                        throw exception_sys_t(log::error,
+                                              errno,
+                                              "blocking_queue_t::pop: %m");
+                    }
                 }
+
+                guard.wakeup();
             }
         }
 
         *value = queue_.remove();
-        queue_cond_.send(true);
+
+        send_to_next();
+
         return true;
     }
 
-    //! @return true iff queue is empty
     bool empty() {
-        bq_cond_guard_t guard(queue_cond_);
-
+        thr::spinlock_guard_t guard(queue_lock_);
         return queue_.get_count() == 0;
     }
 
     //! Switch state to active
     void activate() {
-        bq_cond_guard_t guard(queue_cond_);
+        thr::spinlock_guard_t guard(queue_lock_);
         is_active_ = true;
     }
 
@@ -109,29 +130,49 @@ public:
     //! Note that if queue deactivates and activates again some pop()
     //! and push() calls might stay blocked.
     void deactivate() {
-        bq_cond_guard_t guard(queue_cond_);
-        if (is_active_) {
+        thr::spinlock_guard_t guard(queue_lock_);
+
+        if(is_active_) {
             is_active_ = false;
 
-            queue_cond_.send(true);
+            bq_cond_guard_t not_empty_guard(not_empty_cond_);
+            bq_cond_guard_t not_full_guard(not_full_cond_);
+
+            not_empty_cond_.send(true);
+            not_full_cond_.send(true);
         }
     }
 
     //! Removes all elements from queue. After this call queue still
     //! stores max_size of default constructed x_t.
     void clear() {
-        bq_cond_guard_t guard(queue_cond_);
-        while (queue_.get_count() != 0) {
+        thr::spinlock_guard_t guard(queue_lock_);
+        while(queue_.get_count() != 0) {
             queue_.remove();
         }
-        queue_cond_.send(true);
+
+        bq_cond_guard_t not_full_guard(not_full_cond_);
+        not_full_cond_.send(true);
     }
 
 private:
     size_t max_size_;
     queue_t<x_t> queue_;
-    bq_cond_t queue_cond_;
+    thr::spinlock_t queue_lock_;
+    bq_cond_t not_empty_cond_, not_full_cond_;
     bool is_active_;
+
+    void send_to_next() {
+        if(queue_.get_count() > 0) {
+            bq_cond_guard_t not_empty_guard(not_empty_cond_);
+            not_empty_cond_.send();
+        }
+
+        if(queue_.get_count() < max_size_) {
+            bq_cond_guard_t not_full_guard(not_full_cond_);
+            not_full_cond_.send();
+        }
+    }
 };
 
 }  // namespace phantom
