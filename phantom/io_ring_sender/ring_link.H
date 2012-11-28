@@ -27,7 +27,7 @@ public:
     //! send
     //! @param next_in_the_ring - network address of next acceptor
     //! @param net_timeout - timeout after which connection is
-    //! considered broken and restarted 
+    //! considered broken and restarted
     //! @param obuf_size - size of buffer allocated on stack and used
     //! internally by bq_out_t(in bytes)
     ring_link_t(blocking_queue_t<ref_t<pi_ext_t>>* queue,

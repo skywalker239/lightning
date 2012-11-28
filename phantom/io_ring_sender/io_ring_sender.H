@@ -21,7 +21,7 @@ namespace phantom {
  *
  * Maintains several TCP connections to next acceptor. Shuts them down
  * and starts new when zookeeper ring variable changes.
- * 
+ *
  * When ring changes or TCP connection breaks some blobs might be lost
  * or sent to wrong acceptor.
  */
@@ -40,7 +40,7 @@ public:
     ~io_ring_sender_t() throw();
 
     //! Send blob to next acceptor
-    //! 
+    //!
     //! Blocks if internal queue is full.
     //!
     //! Return immediately and discard blob if current acceptor is not in the ring.

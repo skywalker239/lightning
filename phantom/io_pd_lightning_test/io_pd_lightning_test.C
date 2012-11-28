@@ -175,7 +175,6 @@ private:
                                     int* finished,
                                     bq_cond_t* finished_cond) {
         for (int i = start; i < end; ++i) {
-            
             queue->push(i);
         }
 
@@ -210,7 +209,7 @@ private:
 
     void test_blocking_queue_deactivation() {
         blocking_queue_t<int> queue(1);
-        
+
         ASSERT(queue.push(0));
 
         queue.deactivate();

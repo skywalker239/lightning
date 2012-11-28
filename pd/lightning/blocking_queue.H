@@ -7,7 +7,7 @@
 
 namespace pd {
 
-/** 
+/**
  * Fix-sized queue that can be safely accessed from different phantom
  * coroutines simultaneously.
  *
