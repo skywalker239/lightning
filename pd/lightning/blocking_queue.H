@@ -58,7 +58,7 @@ public:
             guard.wakeup();
         }
 
-        if (is_active_ && wait_succeded) {
+        if(is_active_ && wait_succeded) {
             queue_.insert(value);
         }
 
@@ -100,7 +100,7 @@ public:
             guard.wakeup();
         }
 
-        if (is_active_ && wait_succeded) {
+        if(is_active_ && wait_succeded) {
             *value = queue_.remove();
         }
 
