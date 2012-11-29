@@ -43,36 +43,36 @@ public:
     bool push(const x_t& value, interval_t* timeout = NULL) {
         thr::spinlock_guard_t guard(queue_lock_);
 
-        if(!is_active_) {
-            return false;
-        }
-
-        if(queue_.get_count() == max_size_) {
+        bool wait_succeded = true;
+        int wait_errno = 0;
+        while(queue_.get_count() == max_size_ &&
+              is_active_ &&
+              wait_succeded) {
             bq_cond_guard_t not_full_guard(not_full_cond_);
-            while(queue_.get_count() == max_size_) {
-                guard.relax();
+            guard.relax();
 
-                if(!bq_success(not_full_cond_.wait(timeout))) {
-                    if(errno == ETIMEDOUT || !is_active_) {
-                        return false;
-                    } else {
-                        throw exception_sys_t(log::error,
-                                              errno,
-                                              "blocking_queue_t::push: %m");
-                    }
-                }
+            wait_succeded = bq_success(not_full_cond_.wait(timeout));
+            wait_errno = errno;
 
-                not_full_guard.relax();
-                guard.wakeup();
-                not_full_guard.wakeup();
-            }
+            not_full_guard.relax();
+            guard.wakeup();
         }
 
-        queue_.insert(value);
+        if (is_active_ && wait_succeded) {
+            queue_.insert(value);
+        }
 
         send_to_next();
 
-        return true;
+        if(!is_active_ || (!wait_succeded && wait_errno == ETIMEDOUT)) {
+            return false;
+        } else if(!wait_succeded) {
+            throw exception_sys_t(log::error,
+                                  errno,
+                                  "blocking_queue_t::push: %m");
+        } else {
+            return true;
+        }
     }
 
     //! Pop value from the queue. Blocks if queue is empty until other
@@ -85,36 +85,36 @@ public:
     bool pop(x_t* value, interval_t* timeout = NULL) {
         thr::spinlock_guard_t guard(queue_lock_);
 
-        if(!is_active_) {
-            return false;
-        }
-
-        if(queue_.get_count() == 0) {
+        bool wait_succeded = true;
+        int wait_errno = 0;
+        while(queue_.get_count() == 0 &&
+              is_active_ &&
+              wait_succeded) {
             bq_cond_guard_t not_empty_guard(not_empty_cond_);
-            while(queue_.get_count() == 0) {
-                guard.relax();
+            guard.relax();
 
-                if(!bq_success(not_empty_cond_.wait(timeout))) {
-                    if(errno == ETIMEDOUT || !is_active_) {
-                        return false;
-                    } else {
-                        throw exception_sys_t(log::error,
-                                              errno,
-                                              "blocking_queue_t::pop: %m");
-                    }
-                }
+            wait_succeded = bq_success(not_empty_cond_.wait(timeout));
+            wait_errno = errno;
 
-                not_empty_guard.relax();
-                guard.wakeup();
-                not_empty_guard.wakeup();
-            }
+            not_empty_guard.relax();
+            guard.wakeup();
         }
 
-        *value = queue_.remove();
+        if (is_active_ && wait_succeded) {
+            *value = queue_.remove();
+        }
 
         send_to_next();
 
-        return true;
+        if(!is_active_ || (!wait_succeded && wait_errno == ETIMEDOUT)) {
+            return false;
+        } else if(!wait_succeded) {
+            throw exception_sys_t(log::error,
+                                  errno,
+                                  "blocking_queue_t::push: %m");
+        } else {
+            return true;
+        }
     }
 
     bool empty() {
@@ -138,13 +138,8 @@ public:
 
         if(is_active_) {
             is_active_ = false;
-            guard.relax();
 
-            bq_cond_guard_t not_empty_guard(not_empty_cond_);
-            bq_cond_guard_t not_full_guard(not_full_cond_);
-
-            not_empty_cond_.send(true);
-            not_full_cond_.send(true);
+            send_to_next();
         }
     }
 
@@ -155,10 +150,9 @@ public:
         while(queue_.get_count() != 0) {
             queue_.remove();
         }
-        guard.relax();
 
         bq_cond_guard_t not_full_guard(not_full_cond_);
-        not_full_cond_.send(true);
+        not_full_cond_.send();
     }
 
 private:
@@ -169,12 +163,12 @@ private:
     bool is_active_;
 
     void send_to_next() {
-        if(queue_.get_count() > 0) {
+        if(queue_.get_count() > 0 || !is_active_) {
             bq_cond_guard_t not_empty_guard(not_empty_cond_);
             not_empty_cond_.send();
         }
 
-        if(queue_.get_count() < max_size_) {
+        if(queue_.get_count() < max_size_ || !is_active_) {
             bq_cond_guard_t not_full_guard(not_full_cond_);
             not_full_cond_.send();
         }

@@ -83,7 +83,7 @@ private:
             }
 
             for (int i = 0; i < QUEUE_SIZE; ++i) {
-                int value;
+                int value = -1;
                 if (!queue.pop(&value) || value != i) {
                     fail = true;
                 }
