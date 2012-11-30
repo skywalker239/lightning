@@ -1,3 +1,8 @@
+// This file is part of the pd::pi library.
+// Copyright (C) 2012, Eugene Mamchits <mamchits@yandex-team.ru>.
+// Copyright (C) 2012, YANDEX LLC.
+// This library may be distributed under the terms of the GNU LGPL 2.1.
+// See ‘http://www.gnu.org/licenses/lgpl-2.1.html’.
 #include "pi.H"
 
 #include <pd/base/out.H>
