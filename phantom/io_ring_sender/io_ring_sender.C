@@ -28,30 +28,16 @@ io_ring_sender_t::io_ring_sender_t(const string_t& name, const config_t& config)
     : io_t(name, config),
       host_id_(config.host_id),
       transport_config_(*config.transport_config),
-      queue_(NULL) {}
+      queue_(NULL),
+      queue_size_(config.queue_size),
+      number_of_connections_(config.number_of_connections),
+      obuf_size_(config.obuf_size),
+      net_timeout_(config.net_timeout) {}
 
 io_ring_sender_t::~io_ring_sender_t() {}
 
 void io_ring_sender_t::init() {
-    simple_var_t<size_t> queue_size = transport_config_.ring_sender_queue_size();
-    queue_size.update();
-
-    queue_ = new blocking_queue_t<ref_t<pi_ext_t>>(queue_size.value());
-
-    simple_var_t<size_t> number_of_connections =
-        transport_config_.ring_sender_number_of_connections();
-    number_of_connections.update();
-    number_of_connections_ = number_of_connections.value();
-
-    simple_var_t<size_t> output_buffer_size =
-        transport_config_.ring_sender_output_buffer_size();
-    output_buffer_size.update();
-    obuf_size_ = output_buffer_size.value();
-
-    simple_var_t<interval_t> net_timeout =
-        transport_config_.ring_sender_net_timeout();
-    net_timeout.update();
-    net_timeout_ = net_timeout.value();
+    queue_ = new blocking_queue_t<ref_t<pi_ext_t>>(queue_size_);
 }
 
 void io_ring_sender_t::run() {
@@ -119,6 +105,10 @@ namespace io_ring_sender {
 config_binding_sname(io_ring_sender_t);
 config_binding_value(io_ring_sender_t, host_id);
 config_binding_value(io_ring_sender_t, transport_config);
+config_binding_value(io_ring_sender_t, queue_size);
+config_binding_value(io_ring_sender_t, number_of_connections);
+config_binding_value(io_ring_sender_t, obuf_size);
+config_binding_value(io_ring_sender_t, net_timeout);
 config_binding_parent(io_ring_sender_t, io_t, 1);
 config_binding_ctor(io_t, io_transport_config_t);
 }  // namespace io_ring_sender

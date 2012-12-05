@@ -36,7 +36,17 @@ public:
         uint32_t host_id;
         config::objptr_t<io_transport_config_t> transport_config;
 
-        config_t() throw() : host_id(ring_var_t::kInvalidHostId) {}
+        size_t queue_size;
+        size_t number_of_connections;
+        size_t obuf_size;
+        interval_t net_timeout;
+
+        config_t() throw()
+            : host_id(ring_var_t::kInvalidHostId),
+              queue_size(128),
+              number_of_connections(4),
+              obuf_size(sizeval_kilo),
+              net_timeout(100 * interval_millisecond) {}
         ~config_t() throw() {}
         void check(const in_t::ptr_t& p) const;
     };
@@ -63,6 +73,7 @@ private:
 
     std::vector<ref_t<ring_link_t>> active_links_;
 
+    size_t queue_size_;
     size_t number_of_connections_;
     size_t obuf_size_;
     interval_t net_timeout_;
