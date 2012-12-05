@@ -14,8 +14,7 @@
 
 namespace phantom {
 
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-void ring_link_t::loop(ref_t<ring_link_t> me) {
+void ring_link_t::loop(ref_t<ring_link_t> /* me */) {
     while(!is_stopped()) {
         int fd = socket(next_in_the_ring_.sa->sa_family, SOCK_STREAM, 0);
         if(fd < 0) {
@@ -46,7 +45,6 @@ void ring_link_t::loop(ref_t<ring_link_t> me) {
         }
     }
 }
-#pragma GCC diagnostic pop
 
 void ring_link_t::send_loop(bq_conn_t* conn) {
     char obuf[obuf_size_];
