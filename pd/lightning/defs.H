@@ -17,4 +17,21 @@ typedef uint64_t value_id_t;
 const ballot_id_t kInvalidBallotId = 0U;
 const value_id_t  kInvalidValueId  = 0ULL;
 
+enum ring_cmd_fields_t {
+    RING_CMD_TYPE_FIELD = 0x30,
+    RING_ID_FIELD,
+    RING_SENDER_HOST_ID_FIELD,
+    START_INSTANCE_ID_FIELD,
+    END_INSTANCE_ID_FIELD,
+    REQUEST_ID_FIELD,
+    BALLOT_ID_FIELD,
+    RESERVED_INSTANCES_FIELD
+};
+
+enum ring_cmd_type_t {
+    PHASE1_BATCH = 0x30,
+    PHASE1,
+    PHASE2
+};
+
 }  // namespace pd
