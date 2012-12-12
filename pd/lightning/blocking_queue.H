@@ -33,7 +33,7 @@ template<typename x_t>
 class blocking_queue_t {
 public:
     //! max_size - maximum number of elements queue can hold
-    blocking_queue_t(size_t max_size)
+    explicit blocking_queue_t(size_t max_size)
             : max_size_(max_size),
               queue_(max_size),
               is_active_(true) {}

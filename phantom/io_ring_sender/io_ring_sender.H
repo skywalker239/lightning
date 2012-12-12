@@ -42,8 +42,8 @@ public:
         interval_t net_timeout;
 
         config_t() throw()
-            : host_id(ring_var_t::kInvalidHostId),
-              queue_size(128),
+            : host_id(kInvalidHostId),
+              queue_size(512),
               number_of_connections(4),
               obuf_size(sizeval_kilo),
               net_timeout(100 * interval_millisecond) {}
@@ -69,11 +69,10 @@ private:
     uint32_t host_id_;
     io_transport_config_t& transport_config_;
 
-    blocking_queue_t<ref_t<pi_ext_t>>* queue_;
+    blocking_queue_t<ref_t<pi_ext_t>> cmd_queue_;
 
     std::vector<ref_t<ring_link_t>> active_links_;
 
-    size_t queue_size_;
     size_t number_of_connections_;
     size_t obuf_size_;
     interval_t net_timeout_;

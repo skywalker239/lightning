@@ -19,6 +19,8 @@ $(eval $(call MODULE,io_transport_config,,pi lightning,))
 $(eval $(call MODULE,io_guid,,lightning,))
 $(eval $(call MODULE,io_ring_sender,,pi lightning zookeeper,))
 $(eval $(call MODULE,ring_handler_proto,,pi lightning,))
+
+$(eval $(call MODULE,io_phase_executor_base,,pi lightning zookeeper,))
 $(eval $(call MODULE,io_phase1_batch_executor,,pi lightning zookeeper,))
 
 # test modules

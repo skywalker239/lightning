@@ -17,19 +17,15 @@ typedef uint64_t value_id_t;
 const ballot_id_t kInvalidBallotId = 0U;
 const value_id_t  kInvalidValueId  = 0ULL;
 
-enum ring_cmd_fields_t {
-    RING_CMD_TYPE_FIELD = 0x30,
-    RING_ID_FIELD,
-    RING_SENDER_HOST_ID_FIELD,
-    START_INSTANCE_ID_FIELD,
-    END_INSTANCE_ID_FIELD,
-    REQUEST_ID_FIELD,
-    BALLOT_ID_FIELD,
-    RESERVED_INSTANCES_FIELD
-};
+typedef uint32_t host_id_t;
+typedef uint32_t ring_id_t;
+
+const ring_id_t kInvalidRingId = 0;
+const host_id_t kInvalidHostId = ~0U;
+
 
 enum ring_cmd_type_t {
-    PHASE1_BATCH = 0x30,
+    PHASE1_BATCH = 1,
     PHASE1,
     PHASE2
 };

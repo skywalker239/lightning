@@ -19,7 +19,7 @@ void io_ring_sender_t::config_t::check(const in_t::ptr_t& p) const {
         config::error(p, "io_ring_sender_t.transport_config must be set");
     }
 
-    if(host_id == ring_var_t::kInvalidHostId) {
+    if(host_id == kInvalidHostId) {
         config::error(p, "io_ring_sender_t.host_id must be set");
     }
 }
@@ -28,17 +28,14 @@ io_ring_sender_t::io_ring_sender_t(const string_t& name, const config_t& config)
     : io_t(name, config),
       host_id_(config.host_id),
       transport_config_(*config.transport_config),
-      queue_(NULL),
-      queue_size_(config.queue_size),
+      cmd_queue_(config.queue_size),
       number_of_connections_(config.number_of_connections),
       obuf_size_(config.obuf_size),
       net_timeout_(config.net_timeout) {}
 
 io_ring_sender_t::~io_ring_sender_t() {}
 
-void io_ring_sender_t::init() {
-    queue_ = new blocking_queue_t<ref_t<pi_ext_t>>(queue_size_);
-}
+void io_ring_sender_t::init() {}
 
 void io_ring_sender_t::run() {
     ring_var_t ring = transport_config_.ring();
@@ -51,11 +48,11 @@ void io_ring_sender_t::run() {
         }
 
         if (ring.is_in_ring(host_id_)) {
-            queue_->activate();
+            cmd_queue_.activate();
             start_links(ring);
         } else {
-            queue_->deactivate();
-            queue_->clear();
+            cmd_queue_.deactivate();
+            cmd_queue_.clear();
         }
 
         ring_version = ring.wait(ring_version);
@@ -66,13 +63,11 @@ void io_ring_sender_t::run() {
 
 void io_ring_sender_t::fini() {
     active_links_.clear();
-
-    delete queue_;
-    queue_ = NULL;
+    cmd_queue_.clear();
 }
 
 void io_ring_sender_t::send(const ref_t<pi_ext_t>& blob) {
-    queue_->push(blob);
+    cmd_queue_.push(blob);
 }
 
 void io_ring_sender_t::start_links(const ring_var_t& ring) {
@@ -81,7 +76,7 @@ void io_ring_sender_t::start_links(const ring_var_t& ring) {
 
     for (size_t link = 0; link < number_of_connections_; ++link) {
         active_links_.push_back(ref_t<ring_link_t>(
-            new ring_link_t(queue_, next_in_the_ring, net_timeout_, obuf_size_)));
+            new ring_link_t(&cmd_queue_, next_in_the_ring, net_timeout_, obuf_size_)));
 
         bq_job_t<typeof(&ring_link_t::loop)>::create(
             STRING("ring_link_t"),
