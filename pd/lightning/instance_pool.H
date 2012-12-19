@@ -10,8 +10,8 @@
 #include <queue>
 #include <algorithm>
 
-#include "pd/lightning/defs.H"
-#include "pd/bq/bq_cond.H"
+#include <pd/lightning/defs.H>
+#include <pd/bq/bq_cond.H>
 
 namespace pd {
 
@@ -52,7 +52,14 @@ private:
     instance_heap_t open_instances_;
     instance_heap_t reserved_instances_;
 
-    bq_cond_t instance_cond_;
+    bq_cond_t instance_pool_full_cond_;
+
+    bq_cond_t open_instances_empty_cond_;
+    bq_cond_t reserved_instances_empty_cond_;
+
+    thr::spinlock_t instances_lock_;
+
+    void notify_next();
 };
 
 }  // namespace pd
