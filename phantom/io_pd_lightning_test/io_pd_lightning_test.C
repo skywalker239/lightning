@@ -18,7 +18,9 @@
 #include <pd/base/log.H>
 #include <pd/bq/bq_job.H>
 #include <pd/bq/bq_cond.H>
+#include <pd/bq/bq_util.H>
 #include <pd/lightning/blocking_queue.H>
+#include <pd/lightning/pi_ring_cmd.H>
 
 namespace phantom {
 
@@ -56,6 +58,8 @@ public:
 
         test_blocking_queue();
 
+        test_ring_cmd();
+
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
         kill(getpid(), SIGQUIT);
@@ -68,10 +72,13 @@ private:
     // ===== blocking_queue_t =====
     void test_blocking_queue() {
         log_info("Testing blocking_queue_t");
+
         test_blocking_queue_simple();
         test_blocking_queue_timeout();
         test_blocking_queue_concurrent();
         test_blocking_queue_deactivation();
+        test_deactivation_unblocks();
+
         log_info("Finished testing blocking_queue_t");
     }
 
@@ -116,10 +123,10 @@ private:
     }
 
     void test_blocking_queue_concurrent() {
-        static const int QUEUE_SIZE = 100,
+        static const int QUEUE_SIZE = 8,
                          N_READERS = 50, N_WRITERS = 50,
                          // per one reader / writer
-                         N_WRITES = 1000000, N_READS = 1000000;
+                         N_WRITES = 1000, N_READS = 1000;
         ASSERT(N_READERS * N_READS == N_WRITERS * N_WRITES);
 
         blocking_queue_t<int> queue(QUEUE_SIZE);
@@ -210,6 +217,86 @@ private:
 
         ASSERT(!queue.pop(&value));
         ASSERT(!queue.push(1));
+    }
+
+    void test_deactivation_unblocks() {
+        blocking_queue_t<int>* queue = new blocking_queue_t<int>(1);
+
+        bq_job_t<typeof(&io_pd_lightning_test_t::deactivation_unblocks)>::create(
+                STRING("deactivation_unblocks"),
+                bq_thr_get(),
+                *this,
+                &io_pd_lightning_test_t::deactivation_unblocks,
+                queue);
+
+        interval_t timeout = 10 * interval_millisecond;
+        bq_sleep(&timeout);
+        queue->deactivate();
+
+    }
+
+    void deactivation_unblocks(blocking_queue_t<int>* queue) {
+        int value;
+        ASSERT(!queue->pop(&value));
+        delete queue;
+    }
+
+    // ====== pd/lightning/pi_ring_cmd.H ======
+    void test_ring_cmd() {
+        log_info("Testing pi_ring_cmd.H");
+
+        test_batch_ring_cmd();
+
+        log_info("Finished testing pi_ring_cmd.H");
+    }
+
+    void test_batch_ring_cmd() {
+        std::vector<failed_instance_t> failed{
+            { 1050, 9, LOW_BALLOT_ID },
+            { 1051, 10, RESERVED },
+            { 1052, 11, IID_TO_LOW }
+        };
+
+        ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
+            {
+                request_id: 52,
+                ring_id: 21,
+                dst_host_id: 12
+            },
+            {
+                start_instance_id: 1024,
+                end_instance_id: 2048,
+                ballot_id: 7,
+                failed_instances: failed
+            }
+        );
+
+        ASSERT(ring_cmd_type(cmd) == PHASE1_BATCH);
+
+        ASSERT(request_id(cmd) == 52);
+        ASSERT(ring_id(cmd) == 21);
+        ASSERT(dst_host_id(cmd) == 12);
+
+        ASSERT(start_instance_id(cmd) == 1024);
+        ASSERT(end_instance_id(cmd) == 2048);
+        ASSERT(ballot_id(cmd) == 7);
+
+        std::vector<failed_instance_t> fi =
+            failed_instances_pi_to_vector(failed_instances(cmd));
+
+        ASSERT(fi[0].iid == 1050);
+        ASSERT(fi[0].highest_promise == 9);
+        ASSERT(fi[0].status == LOW_BALLOT_ID);
+
+        ASSERT(fi[1].iid == 1051);
+        ASSERT(fi[1].highest_promise == 10);
+        ASSERT(fi[1].status == RESERVED);
+
+        ASSERT(fi[2].iid == 1052);
+        ASSERT(fi[2].highest_promise == 11);
+        ASSERT(fi[2].status == IID_TO_LOW);
+
+        ASSERT(is_ring_cmd_valid(cmd));
     }
 };
 

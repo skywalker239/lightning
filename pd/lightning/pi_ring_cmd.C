@@ -17,6 +17,7 @@ bool is_ring_cmd_header_valid(const ref_t<pi_ext_t>& ring_cmd) {
         return false;
     }
 
+    // TODO(prime@): check element types
     return true;
 }
 
@@ -28,7 +29,7 @@ bool is_ring_cmd_batch_valid(const ref_t<pi_ext_t>& ring_cmd) {
         return false;
     }
 
-    if(batch_data.s_ind(4).type() != pi_t::_array) {
+    if(batch_data.s_ind(3).type() != pi_t::_array) {
         return false;
     }
 
@@ -45,13 +46,9 @@ bool is_ring_cmd_valid(const ref_t<pi_ext_t>& ring_cmd) {
         return false;
     }
 
-    switch(ring_cmd->pi().s_enum()) {
+    switch(ring_cmd->pi().s_ind(0).s_enum()) {
       case PHASE1_BATCH:
-        if(is_ring_cmd_batch_valid(ring_cmd)) {
-            return true;
-        } else {
-            return false;
-        }
+        return is_ring_cmd_batch_valid(ring_cmd);
       case PHASE1:
         // TODO(prime@) write validation code
         return false;
@@ -72,11 +69,23 @@ std::vector<failed_instance_t> failed_instances_pi_to_vector(
     for(size_t i = 0; i < failed_instances._count(); ++i) {
         instances.push_back({
             failed_instance_iid(failed_instances[i]),
-            failed_instance_highest_promise(failed_instances[i])
+            failed_instance_highest_promise(failed_instances[i]),
+            failed_instance_status(failed_instances[i])
         });
     }
 
     return instances;
+}
+
+failed_instance_status_t merge_status(failed_instance_status_t local,
+                                      failed_instance_status_t received) {
+    if(local == IID_TO_LOW || received == IID_TO_LOW) {
+        return IID_TO_LOW;
+    } else if(local == RESERVED || received == RESERVED) {
+        return RESERVED;
+    } else {
+        return LOW_BALLOT_ID;
+    }
 }
 
 std::vector<failed_instance_t> merge_failed_instances(
@@ -100,7 +109,9 @@ std::vector<failed_instance_t> merge_failed_instances(
             merged.push_back({
                 local_instance->iid,
                 max(local_instance->highest_promise,
-                    received_instance->highest_promise)
+                    received_instance->highest_promise),
+                merge_status(local_instance->status,
+                             received_instance->status)
             });
             ++local_instance;
             ++received_instance;
@@ -120,28 +131,51 @@ std::vector<failed_instance_t> merge_failed_instances(
     return merged;
 }
 
-ref_t<pi_ext_t> build_ring_batch_cmd(
+inline ref_t<pi_ext_t> build_ring_cmd(
+        ring_cmd_type_t cmd_type,
         const ring_cmd_header_t& header,
-        const ring_batch_cmd_body_t& body) {
+        pi_t::pro_t& pi_body) {
     pi_t::pro_t header_items[3] = {
         pi_t::pro_t::uint_t(header.request_id),
         pi_t::pro_t::uint_t(header.ring_id),
-        pi_t::pro_t::uint_t(header.host_id)
+        pi_t::pro_t::uint_t(header.dst_host_id)
     };
 
     pi_t::pro_t::array_t pi_header_array = { 3, header_items };
     pi_t::pro_t pi_header(pi_header_array);
 
+    pi_t::pro_t cmd_items[3] = {
+        pi_t::pro_t::enum_t(cmd_type),
+        pi_header,
+        pi_body
+    };
+
+    pi_t::pro_t::array_t cmd_array = { 3, cmd_items };
+    pi_t::pro_t cmd(cmd_array);
+
+    return pi_ext_t::__build(cmd);
+}
+
+ref_t<pi_ext_t> build_ring_batch_cmd(
+        const ring_cmd_header_t& header,
+        const ring_batch_cmd_body_t& body) {
     pi_t::pro_t failed_instances_pros[body.failed_instances.size()];
     pi_t::pro_t::array_t failed_instances_arrays[body.failed_instances.size()];
-    pi_t::pro_t failed_instances_fields[body.failed_instances.size()][2];
+    pi_t::pro_t failed_instances_fields[body.failed_instances.size()][3];
+
+    static_assert((&(failed_instances_fields[0][3]) -
+                   &(failed_instances_fields[0][0])) != 3 * sizeof(pi_t::pro_t),
+                  "prime@ was wrong about 2D array memory layout");
+
     for(size_t i = 0; i < body.failed_instances.size(); ++i) {
         failed_instances_fields[i][0] =
             pi_t::pro_t::uint_t(body.failed_instances[i].iid);
         failed_instances_fields[i][1] =
             pi_t::pro_t::uint_t(body.failed_instances[i].highest_promise);
+        failed_instances_fields[i][2] =
+            pi_t::pro_t::enum_t(body.failed_instances[i].status);
 
-        failed_instances_arrays[i] = { 2, failed_instances_fields[i] };
+        failed_instances_arrays[i] = { 3, failed_instances_fields[i] };
         failed_instances_pros[i] = failed_instances_arrays[i];
     }
 
@@ -161,16 +195,7 @@ ref_t<pi_ext_t> build_ring_batch_cmd(
     pi_t::pro_t::array_t pi_body_array = { 4, body_items };
     pi_t::pro_t pi_body(pi_body_array);
 
-    pi_t::pro_t cmd_items[3] = {
-        pi_t::pro_t::enum_t(PHASE1_BATCH),
-        pi_header,
-        pi_body
-    };
-
-    pi_t::pro_t::array_t cmd_array = {3, cmd_items };
-    pi_t::pro_t cmd(cmd_array);
-
-    return pi_ext_t::__build(cmd);
+    return build_ring_cmd(PHASE1_BATCH, header, pi_body);
 }
 
 }

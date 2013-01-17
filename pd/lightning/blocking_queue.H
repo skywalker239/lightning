@@ -116,7 +116,7 @@ public:
         } else if(!wait_succeded) {
             throw exception_sys_t(log::error,
                                   errno,
-                                  "blocking_queue_t::push: %m");
+                                  "blocking_queue_t::pop: %m");
         } else {
             return true;
         }
@@ -156,8 +156,7 @@ public:
             queue_.remove();
         }
 
-        bq_cond_guard_t not_full_guard(not_full_cond_);
-        not_full_cond_.send();
+        send_to_next();
     }
 
 private:

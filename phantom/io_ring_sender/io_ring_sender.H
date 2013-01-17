@@ -17,33 +17,25 @@
 #include <phantom/io_transport_config/io_transport_config.H>
 #include <phantom/io_ring_sender/ring_link.H>
 
-#pragma GCC visibitily push(default)
+#pragma GCC visibility push(default)
 
 namespace phantom {
 
 /**
  * Sends blobs to next acceptor in the ring.
  *
- * Maintains several TCP connections to next acceptor. Shuts them down
- * and starts new when zookeeper ring variable changes.
- *
- * When ring changes or TCP connection breaks some blobs might be lost
- * or sent to wrong acceptor.
+ * Doesn't guarantee delivery.
  */
 class io_ring_sender_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
-        uint32_t host_id;
-        config::objptr_t<io_transport_config_t> transport_config;
-
         size_t queue_size;
         size_t number_of_connections;
         size_t obuf_size;
         interval_t net_timeout;
 
         config_t() throw()
-            : host_id(kInvalidHostId),
-              queue_size(512),
+            : queue_size(512),
               number_of_connections(4),
               obuf_size(sizeval_kilo),
               net_timeout(100 * interval_millisecond) {}
@@ -56,19 +48,24 @@ public:
 
     //! Send blob to next acceptor
     //!
-    //! Blocks if internal queue is full.
+    //! Blocks if internal queue is full
     //!
-    //! Return immediately and discard blob if current acceptor is not in the ring.
+    //! Does nothing if host is not in the ring
     void send(const ref_t<pi_ext_t>& blob);
+
+    //! Shutdown connections and disable ring_sender_t.
+    void exit_ring();
+
+    //! Shutdown old connections and join new ring.
+    void join_ring(netaddr_ipv4_t next_in_the_ring);
 
     virtual void init();
     virtual void run();
     virtual void fini();
 
-private:
-    uint32_t host_id_;
-    io_transport_config_t& transport_config_;
+    virtual void stat(out_t&, bool) { /* TODO(prime@) */ }
 
+private:
     blocking_queue_t<ref_t<pi_ext_t>> cmd_queue_;
 
     std::vector<ref_t<ring_link_t>> active_links_;

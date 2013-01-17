@@ -23,11 +23,4 @@ typedef uint32_t ring_id_t;
 const ring_id_t kInvalidRingId = 0;
 const host_id_t kInvalidHostId = ~0U;
 
-
-enum ring_cmd_type_t {
-    PHASE1_BATCH = 1,
-    PHASE1,
-    PHASE2
-};
-
 }  // namespace pd
