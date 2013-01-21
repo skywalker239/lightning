@@ -17,4 +17,10 @@ typedef uint64_t value_id_t;
 const ballot_id_t kInvalidBallotId = 0U;
 const value_id_t  kInvalidValueId  = 0ULL;
 
+typedef uint32_t host_id_t;
+typedef uint32_t ring_id_t;
+
+const ring_id_t kInvalidRingId = 0;
+const host_id_t kInvalidHostId = ~0U;
+
 }  // namespace pd

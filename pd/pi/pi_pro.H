@@ -117,6 +117,9 @@ struct pi_t::pro_t::array_t {
 	count_t count;
 	pro_t const *items;
 
+    inline array_t() :
+        count(0), items(NULL) { }
+
 	inline array_t(count_t _count, pro_t const *_items) throw() :
 		count(_count), items(_items) { }
 };
