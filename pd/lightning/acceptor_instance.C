@@ -34,9 +34,12 @@ void acceptor_instance_t::next_ballot(ballot_id_t  proposed_ballot,
 
     highest_promised_ballot_ = proposed_ballot;
     *highest_promised_ballot = highest_promised_ballot_;
-    *highest_voted_ballot    = highest_voted_ballot_;
-    
-    if(highest_voted_ballot_ != kInvalidBallotId) {
+
+    if(highest_voted_ballot) {
+        *highest_voted_ballot = highest_voted_ballot_;
+    }
+
+    if(highest_voted_ballot_ != kInvalidBallotId && last_vote) {
         *last_vote = last_vote_;
     }
 }

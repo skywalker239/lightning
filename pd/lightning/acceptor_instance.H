@@ -30,11 +30,11 @@ public:
     //    * highest_voted_ballot is set to the highest ballot number in which
     //      this acceptor has voted. If the acceptor has not voted in any
     //      ballot, this will be set to kInvalidBallotId and last_vote
-    //      will be undefined.
+    //      will be undefined. Ignored if set to NULL.
     //
     //    * last_vote is set to the value for which the acceptor has voted
-    //      in ballot highest_voted_ballot.
-    void next_ballot(ballot_id_t  proposed_ballot,  
+    //      in ballot highest_voted_ballot. Ignored if set to NULL.
+    void next_ballot(ballot_id_t  proposed_ballot,
                      ballot_id_t* highest_promised_ballot,
                      ballot_id_t* highest_voted_ballot,
                      value_t*     last_vote);

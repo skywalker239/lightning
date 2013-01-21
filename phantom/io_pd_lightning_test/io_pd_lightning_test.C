@@ -1,3 +1,8 @@
+// Copyright (C) 2012, Korotkiy Fedor <prime@yandex-team.ru>
+// Copyright (C) 2012, YANDEX LLC.
+// This code may be distributed under the terms of the GNU GPL v3.
+// See ‘http://www.gnu.org/licenses/gpl.html’.
+// vim: set tabstop=4 expandtab:
 #include <sys/types.h>
 #include <signal.h>
 #include <unistd.h>
@@ -13,7 +18,9 @@
 #include <pd/base/log.H>
 #include <pd/bq/bq_job.H>
 #include <pd/bq/bq_cond.H>
+#include <pd/bq/bq_util.H>
 #include <pd/lightning/blocking_queue.H>
+#include <pd/lightning/pi_ring_cmd.H>
 
 namespace phantom {
 
@@ -51,6 +58,8 @@ public:
 
         test_blocking_queue();
 
+        test_ring_cmd();
+
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
         kill(getpid(), SIGQUIT);
@@ -63,10 +72,13 @@ private:
     // ===== blocking_queue_t =====
     void test_blocking_queue() {
         log_info("Testing blocking_queue_t");
+
         test_blocking_queue_simple();
         test_blocking_queue_timeout();
         test_blocking_queue_concurrent();
         test_blocking_queue_deactivation();
+        test_deactivation_unblocks();
+
         log_info("Finished testing blocking_queue_t");
     }
 
@@ -83,7 +95,7 @@ private:
             }
 
             for (int i = 0; i < QUEUE_SIZE; ++i) {
-                int value;
+                int value = -1;
                 if (!queue.pop(&value) || value != i) {
                     fail = true;
                 }
@@ -111,19 +123,20 @@ private:
     }
 
     void test_blocking_queue_concurrent() {
-        int QUEUE_SIZE = 10, N_READERS = 10, N_PUSHERS = 3, N_WRITES = 1000;
+        static const int QUEUE_SIZE = 8,
+                         N_READERS = 50, N_WRITERS = 50,
+                         // per one reader / writer
+                         N_WRITES = 1000, N_READS = 1000;
+        ASSERT(N_READERS * N_READS == N_WRITERS * N_WRITES);
+
         blocking_queue_t<int> queue(QUEUE_SIZE);
 
-        int pushers_finished = 0;
-        bq_cond_t pusher_finished_cond;
-
-        bool stop_readers = false;
         int readers_stopped = 0;
         bq_cond_t readers_stop_cond;
 
-        std::vector<int> poped_elements(N_PUSHERS * N_WRITES, 0);
+        std::vector<int> poped_elements(N_WRITERS * N_WRITES, 0);
 
-        for (int pusher = 0; pusher < N_PUSHERS; ++pusher) {
+        for (int pusher = 0; pusher < N_WRITERS; ++pusher) {
             bq_job_t<typeof(&io_pd_lightning_test_t::test_blocking_queue_pusher)>::create(
                 STRING("test_blocking_queue_pusher"),
                 bq_thr_get(),
@@ -131,9 +144,7 @@ private:
                 &io_pd_lightning_test_t::test_blocking_queue_pusher,
                 &queue,
                 N_WRITES * pusher,
-                N_WRITES * (pusher + 1),
-                &pushers_finished,
-                &pusher_finished_cond);
+                N_WRITES * (pusher + 1));
         }
 
         for (int reader = 0; reader < N_READERS; ++reader) {
@@ -143,26 +154,20 @@ private:
                 *this,
                 &io_pd_lightning_test_t::test_blocking_queue_reader,
                 &queue,
-                &stop_readers,
-                &readers_stopped,
+                N_READS,
                 &poped_elements,
+                &readers_stopped,
                 &readers_stop_cond);
         }
 
-        bq_cond_guard_t pusher_guard(pusher_finished_cond);
-        while(pushers_finished != N_PUSHERS) {
-            pusher_finished_cond.wait(NULL);
-        }
-
         bq_cond_guard_t readers_guard(readers_stop_cond);
-        stop_readers = true;
         while(readers_stopped != N_READERS) {
             readers_stop_cond.wait(NULL);
         }
 
         bool fail = false;
         for (int element : poped_elements) {
-            if (element == 0) {
+            if (element != 1) {
                 fail = true;
             }
         }
@@ -171,40 +176,29 @@ private:
 
     void test_blocking_queue_pusher(blocking_queue_t<int>* queue,
                                     int start,
-                                    int end,
-                                    int* finished,
-                                    bq_cond_t* finished_cond) {
+                                    int end) {
         for (int i = start; i < end; ++i) {
             queue->push(i);
         }
-
-        bq_cond_guard_t guard(*finished_cond);
-        ++(*finished);
-        finished_cond->send();
     }
 
     void test_blocking_queue_reader(blocking_queue_t<int>* queue,
-                                    bool* stop,
-                                    int* readers_stopped,
+                                    int number_of_elements_to_read,
                                     std::vector<int>* poped_elements,
+                                    int* readers_stopped,
                                     bq_cond_t* stop_cond) {
-        interval_t timeout;
-        while (true) {
-            {
-                bq_cond_guard_t guard(*stop_cond);
-                if (*stop && queue->empty()) {
-                    ++(*readers_stopped);
-                    stop_cond->send();
-                    break;
-                }
-            }
+        for (int elements_read = 0;
+             elements_read < number_of_elements_to_read;
+             ++elements_read) {
 
-            timeout = interval_millisecond;
-            int value;
-            if (queue->pop(&value, &timeout)) {
-                (*poped_elements)[value] += 1;
-            }
+            int value = 0;
+            queue->pop(&value);
+            (*poped_elements)[value] += 1;
         }
+
+        bq_cond_guard_t stop_guard(*stop_cond);
+        ++(*readers_stopped);
+        stop_cond->send();
     }
 
     void test_blocking_queue_deactivation() {
@@ -223,6 +217,86 @@ private:
 
         ASSERT(!queue.pop(&value));
         ASSERT(!queue.push(1));
+    }
+
+    void test_deactivation_unblocks() {
+        blocking_queue_t<int>* queue = new blocking_queue_t<int>(1);
+
+        bq_job_t<typeof(&io_pd_lightning_test_t::deactivation_unblocks)>::create(
+                STRING("deactivation_unblocks"),
+                bq_thr_get(),
+                *this,
+                &io_pd_lightning_test_t::deactivation_unblocks,
+                queue);
+
+        interval_t timeout = 10 * interval_millisecond;
+        bq_sleep(&timeout);
+        queue->deactivate();
+
+    }
+
+    void deactivation_unblocks(blocking_queue_t<int>* queue) {
+        int value;
+        ASSERT(!queue->pop(&value));
+        delete queue;
+    }
+
+    // ====== pd/lightning/pi_ring_cmd.H ======
+    void test_ring_cmd() {
+        log_info("Testing pi_ring_cmd.H");
+
+        test_batch_ring_cmd();
+
+        log_info("Finished testing pi_ring_cmd.H");
+    }
+
+    void test_batch_ring_cmd() {
+        std::vector<failed_instance_t> failed{
+            { 1050, 9, LOW_BALLOT_ID },
+            { 1051, 10, RESERVED },
+            { 1052, 11, IID_TO_LOW }
+        };
+
+        ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
+            {
+                request_id: 52,
+                ring_id: 21,
+                dst_host_id: 12
+            },
+            {
+                start_instance_id: 1024,
+                end_instance_id: 2048,
+                ballot_id: 7,
+                failed_instances: failed
+            }
+        );
+
+        ASSERT(ring_cmd_type(cmd) == PHASE1_BATCH);
+
+        ASSERT(request_id(cmd) == 52);
+        ASSERT(ring_id(cmd) == 21);
+        ASSERT(dst_host_id(cmd) == 12);
+
+        ASSERT(start_instance_id(cmd) == 1024);
+        ASSERT(end_instance_id(cmd) == 2048);
+        ASSERT(ballot_id(cmd) == 7);
+
+        std::vector<failed_instance_t> fi =
+            failed_instances_pi_to_vector(failed_instances(cmd));
+
+        ASSERT(fi[0].iid == 1050);
+        ASSERT(fi[0].highest_promise == 9);
+        ASSERT(fi[0].status == LOW_BALLOT_ID);
+
+        ASSERT(fi[1].iid == 1051);
+        ASSERT(fi[1].highest_promise == 10);
+        ASSERT(fi[1].status == RESERVED);
+
+        ASSERT(fi[2].iid == 1052);
+        ASSERT(fi[2].highest_promise == 11);
+        ASSERT(fi[2].status == IID_TO_LOW);
+
+        ASSERT(is_ring_cmd_valid(cmd));
     }
 };
 

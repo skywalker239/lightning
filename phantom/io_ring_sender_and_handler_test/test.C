@@ -1,0 +1,244 @@
+// Copyright (C) 2012, Korotkiy Fedor <prime@yandex-team.ru>
+// Copyright (C) 2012, YANDEX LLC.
+// This code may be distributed under the terms of the GNU GPL v3.
+// See ‘http://www.gnu.org/licenses/gpl.html’.
+// vim: set tabstop=4 expandtab:
+#include <sys/types.h>
+#include <signal.h>
+#include <unistd.h>
+
+#include <vector>
+
+#include <pd/bq/bq_job.H>
+#include <pd/bq/bq_util.H>
+#include <pd/base/thr.H>
+#include <pd/base/log.H>
+#include <pd/lightning/pi_ext.H>
+#include <pd/lightning/pi_ring_cmd.H>
+
+#include <phantom/io.H>
+#include <phantom/module.H>
+#include <phantom/io_ring_sender/io_ring_sender.H>
+#include <phantom/ring_handler/ring_handler.H>
+#include <phantom/ring_handler/ring_handler_proto.H>
+
+namespace phantom {
+
+MODULE(io_ring_sender_and_handler_test);
+
+#ifdef ASSERT
+#error ***ASSERT macros already defined***
+#endif
+
+#define ASSERT(value) \
+do { \
+  if (!(value)) { \
+    log_error("FAIL %s in %s:%d", __func__, __FILE__, __LINE__); \
+  } \
+} while(0) \
+
+struct test_ring_handler_t : public ring_handler_t {
+    struct config_t {
+        void check(const in_t::ptr_t&) const {};
+    };
+
+	inline test_ring_handler_t(string_t const &, config_t const &) {}
+
+    virtual void handle_cmd(const ref_t<pi_ext_t>& ring_cmd) {
+        thr::spinlock_guard_t guard(lock_);
+
+        received_.push_back(ring_cmd);
+    }
+
+    size_t size() {
+        thr::spinlock_guard_t guard(lock_);
+
+        return received_.size();
+    }
+
+    void clear() {
+        thr::spinlock_guard_t guard(lock_);
+
+        received_.clear();
+    }
+
+    std::vector<ref_t<pi_ext_t>> received_;
+
+    thr::spinlock_t lock_;
+};
+
+namespace test_ring_handler {
+config_binding_sname(test_ring_handler_t);
+config_binding_ctor(ring_handler_t, test_ring_handler_t);
+}
+
+static const uint16_t kProto1Port = 34843;
+static const uint16_t kProto2Port = 34844;
+static const host_id_t kProto1Host = 12;
+static const host_id_t kProto2Host = 14;
+
+class io_ring_sender_and_handler_test_t : public io_t {
+public:
+    struct config_t : public io_t::config_t {
+        config::objptr_t<io_ring_sender_t> sender;
+
+        config::objptr_t<ring_handler_proto_t> proto1;
+        config::objptr_t<test_ring_handler_t> proto1_handler;
+
+        config::objptr_t<ring_handler_proto_t> proto2;
+        config::objptr_t<test_ring_handler_t> proto2_handler;
+
+        void check(const in_t::ptr_t& ) const {}
+    };
+
+    io_ring_sender_and_handler_test_t(const string_t& name,
+                                      const config_t& c)
+        : io_t(name, c),
+          sender_(c.sender),
+          proto1_(c.proto1),
+          proto1_handler_(c.proto1_handler),
+          proto2_(c.proto2),
+          proto2_handler_(c.proto2_handler) {}
+
+    virtual void run() {
+        test_ring_handler_ignores_cmds_with_wrong_dst();
+        test_ring_sender_ring_switch();
+        test_ring_sender_exit_ring();
+
+        log_info("All tests finished");
+        log_info("Sending SIGQUIT");
+        kill(getpid(), SIGQUIT);
+    }
+
+    void test_stress() {
+
+    }
+
+    void test_ring_sender_ring_switch() {
+        reset_all();
+
+        proto1_->ring_changed(30);
+        sender_->join_ring(
+            netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
+                           kProto1Port));
+        sender_->send(build_cmd(30, kProto1Host));
+        sleep();
+
+        sender_->exit_ring();
+        sleep();
+
+        proto2_->ring_changed(31);
+        sender_->join_ring(
+            netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
+                           kProto2Port));
+        sleep();
+
+        sender_->send(build_cmd(31, kProto2Host));
+
+        sleep();
+        sender_->exit_ring();
+
+        ASSERT(proto1_handler_->size() == 1);
+        ASSERT(proto2_handler_->size() == 1);
+    }
+
+    void test_ring_sender_exit_ring() {
+        reset_all();
+
+        proto1_->ring_changed(30);
+
+        sender_->join_ring(
+            netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
+                           kProto1Port));
+        sender_->send(build_cmd(30, kProto1Host));
+        sleep();
+
+        sender_->exit_ring();
+        sleep();
+
+        sender_->send(build_cmd(30, kProto1Host));
+        sleep();
+
+        ASSERT(proto1_handler_->size() == 1);
+    }
+
+    void test_ring_handler_ignores_cmds_with_wrong_dst() {
+        reset_all();
+
+        proto1_->ring_changed(30);
+        sender_->join_ring(
+            netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
+                           kProto1Port));
+
+        sender_->send(build_cmd(31, kProto1Host));
+        sender_->send(build_cmd(30, kProto1Host + 1));
+        sender_->send(build_cmd(31, kProto1Host + 1));
+
+        sleep();
+        ASSERT(proto1_handler_->size() == 0);
+    }
+
+    ref_t<pi_ext_t> build_cmd(ring_id_t ring_id, host_id_t dst_host_id) {
+        ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
+            {
+                request_id: 52,
+                ring_id: ring_id,
+                dst_host_id: dst_host_id
+            },
+            {
+                start_instance_id: 1024,
+                end_instance_id: 2048,
+                ballot_id: 7,
+                failed_instances: std::vector<failed_instance_t>()
+            }
+        );
+
+        return cmd;
+    }
+
+    void reset_all() {
+        sender_->exit_ring();
+        proto1_->ring_changed(kInvalidRingId);
+        proto2_->ring_changed(kInvalidRingId);
+
+        sleep();
+
+        proto1_handler_->clear();
+        proto2_handler_->clear();
+    }
+
+    void sleep() {
+        interval_t timeout = 100 * interval_millisecond;
+        bq_sleep(&timeout);
+    }
+
+    virtual void init() {}
+    virtual void fini() {}
+    virtual void stat(pd::out_t& , bool) {}
+
+    virtual ~io_ring_sender_and_handler_test_t() {}
+
+private:
+    io_ring_sender_t* sender_;
+    ring_handler_proto_t* proto1_;
+    test_ring_handler_t* proto1_handler_;
+    ring_handler_proto_t* proto2_;
+    test_ring_handler_t* proto2_handler_;
+};
+
+namespace io_ring_sender_and_handler_test {
+config_binding_sname(io_ring_sender_and_handler_test_t);
+
+config_binding_value(io_ring_sender_and_handler_test_t, sender);
+config_binding_value(io_ring_sender_and_handler_test_t, proto1);
+config_binding_value(io_ring_sender_and_handler_test_t, proto1_handler);
+config_binding_value(io_ring_sender_and_handler_test_t, proto2);
+config_binding_value(io_ring_sender_and_handler_test_t, proto2_handler);
+
+config_binding_parent(io_ring_sender_and_handler_test_t, io_t, 1);
+config_binding_ctor(io_t, io_ring_sender_and_handler_test_t);
+} // namespace io_ring_sender
+
+#undef ASSERT
+
+} // namespace phantom
