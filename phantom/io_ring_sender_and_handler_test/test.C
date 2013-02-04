@@ -104,6 +104,7 @@ public:
         test_ring_handler_ignores_cmds_with_wrong_dst();
         test_ring_sender_ring_switch();
         test_ring_sender_exit_ring();
+		test_stress();
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -111,7 +112,23 @@ public:
     }
 
     void test_stress() {
+        reset_all();
 
+        for(ring_id_t ring_id = 1; ring_id < 100; ++ring_id) {
+            uint16_t port = ring_id % 2 == 0 ? kProto1Port : kProto2Port;
+            host_id_t host = ring_id % 2 == 0 ? kProto1Host : kProto2Host;
+
+            proto1_->ring_changed(ring_id);
+            proto2_->ring_changed(ring_id);
+
+            sender_->join_ring(
+                netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
+                               port));
+
+            for(int i = 0; i < 100; ++i) {
+                sender_->send(build_cmd(ring_id, host));
+            }
+        }
     }
 
     void test_ring_sender_ring_switch() {

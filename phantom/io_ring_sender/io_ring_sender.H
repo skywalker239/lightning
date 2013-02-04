@@ -30,13 +30,13 @@ class io_ring_sender_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
         size_t queue_size;
-        size_t number_of_connections;
+        size_t n_connections;
         size_t obuf_size;
         interval_t net_timeout;
 
         config_t() throw()
             : queue_size(512),
-              number_of_connections(4),
+              n_connections(4),
               obuf_size(sizeval_kilo),
               net_timeout(100 * interval_millisecond) {}
         ~config_t() throw() {}

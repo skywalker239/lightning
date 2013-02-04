@@ -6,6 +6,7 @@
 #include <phantom/ring_handler/ring_handler_proto.H>
 
 #include <pd/base/log.H>
+#include <pd/base/assert.H>
 #include <pd/lightning/pi_ext.H>
 #include <pd/lightning/pi_ring_cmd.H>
 
@@ -44,7 +45,10 @@ ring_handler_proto_t::ring_handler_proto_t(const string_t&,
       phase1_batch_handler_(config.phase1_batch_handler),
       phase1_handler_(config.phase1_handler),
       phase2_handler_(config.phase2_handler),
-      current_ring_(kInvalidRingId) {}
+      current_ring_(kInvalidRingId) {
+    // check that std::atomic<ring_id_t> provides lock-free synchronization
+    assert(current_ring_.is_lock_free());
+}
 
 
 bool ring_handler_proto_t::request_proc(in_t::ptr_t& in_ptr,
@@ -100,8 +104,10 @@ void ring_handler_proto_t::ring_changed(ring_id_t new_ring) {
 
 namespace ring_handler_proto {
 config_binding_sname(ring_handler_proto_t);
-config_binding_type(ring_handler_proto_t, ring_handler_t);
 config_binding_value(ring_handler_proto_t, this_host_id);
+
+config_binding_type(ring_handler_proto_t, ring_handler_t);
+
 config_binding_value(ring_handler_proto_t, phase1_batch_handler);
 config_binding_value(ring_handler_proto_t, phase1_handler);
 config_binding_value(ring_handler_proto_t, phase2_handler);

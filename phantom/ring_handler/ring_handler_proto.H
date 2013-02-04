@@ -36,7 +36,7 @@ class ring_handler_proto_t : public io_stream::proto_t {
 public:
     typedef ring_handler_proto::ring_handler_t ring_handler_t;
 
-    struct config_t : public io_t::config_t {
+    struct config_t {
         host_id_t this_host_id;
 
         config_binding_type_ref(ring_handler_t);
@@ -48,7 +48,7 @@ public:
         void check(const in_t::ptr_t& p) const;
     };
 
-    ring_handler_proto_t(const string_t&,
+    ring_handler_proto_t(const string_t& /* name */,
                          const config_t& config);
 
     void ring_changed(ring_id_t new_ring);

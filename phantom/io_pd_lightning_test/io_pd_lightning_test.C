@@ -246,8 +246,37 @@ private:
         log_info("Testing pi_ring_cmd.H");
 
         test_batch_ring_cmd();
+        test_batch_ring_cmd_empty_failed_instances();
 
         log_info("Finished testing pi_ring_cmd.H");
+    }
+
+    void test_batch_ring_cmd_empty_failed_instances() {
+        ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
+            {
+                request_id: 52,
+                ring_id: 21,
+                dst_host_id: 12
+            },
+            {
+                start_instance_id: 1024,
+                end_instance_id: 2048,
+                ballot_id: 7,
+                failed_instances: std::vector<failed_instance_t>()
+            }
+        );
+
+        ASSERT(ring_cmd_type(cmd) == PHASE1_BATCH);
+
+        ASSERT(request_id(cmd) == 52);
+        ASSERT(ring_id(cmd) == 21);
+        ASSERT(dst_host_id(cmd) == 12);
+
+        ASSERT(start_instance_id(cmd) == 1024);
+        ASSERT(end_instance_id(cmd) == 2048);
+        ASSERT(ballot_id(cmd) == 7);
+
+        ASSERT(failed_instances(cmd)._count() == 0);
     }
 
     void test_batch_ring_cmd() {
