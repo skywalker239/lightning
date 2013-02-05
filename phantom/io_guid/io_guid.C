@@ -21,6 +21,10 @@ void io_guid_t::config_t::check(const in_t::ptr_t& p) const {
     if(host_id == -1) {
         config::error(p, "host_id must be set");
     }
+
+    if(host_id > 1 << 12) {
+        config::error(p, "host_id is to big");
+    }
 }
 
 io_guid_t::io_guid_t(const string_t& name, const config_t& config)

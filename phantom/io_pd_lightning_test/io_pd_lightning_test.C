@@ -283,7 +283,7 @@ private:
         std::vector<failed_instance_t> failed{
             { 1050, 9, LOW_BALLOT_ID },
             { 1051, 10, RESERVED },
-            { 1052, 11, IID_TO_LOW }
+            { 1052, 11, IID_TOO_LOW }
         };
 
         ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
@@ -314,16 +314,16 @@ private:
             failed_instances_pi_to_vector(failed_instances(cmd));
 
         ASSERT(fi[0].iid == 1050);
-        ASSERT(fi[0].highest_promise == 9);
+        ASSERT(fi[0].highest_promised == 9);
         ASSERT(fi[0].status == LOW_BALLOT_ID);
 
         ASSERT(fi[1].iid == 1051);
-        ASSERT(fi[1].highest_promise == 10);
+        ASSERT(fi[1].highest_promised == 10);
         ASSERT(fi[1].status == RESERVED);
 
         ASSERT(fi[2].iid == 1052);
-        ASSERT(fi[2].highest_promise == 11);
-        ASSERT(fi[2].status == IID_TO_LOW);
+        ASSERT(fi[2].highest_promised == 11);
+        ASSERT(fi[2].status == IID_TOO_LOW);
 
         ASSERT(is_ring_cmd_valid(cmd));
     }

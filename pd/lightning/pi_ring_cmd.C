@@ -79,8 +79,10 @@ std::vector<failed_instance_t> failed_instances_pi_to_vector(
 
 failed_instance_status_t merge_status(failed_instance_status_t local,
                                       failed_instance_status_t received) {
-    if(local == IID_TO_LOW || received == IID_TO_LOW) {
-        return IID_TO_LOW;
+    if(local == IID_TOO_LOW || received == IID_TOO_LOW) {
+        return IID_TOO_LOW;
+    } else if(local == IID_TOO_HIGH || received == IID_TOO_HIGH) {
+        return IID_TOO_HIGH;
     } else if(local == RESERVED || received == RESERVED) {
         return RESERVED;
     } else {
@@ -108,8 +110,8 @@ std::vector<failed_instance_t> merge_failed_instances(
         } else {
             merged.push_back({
                 local_instance->iid,
-                max(local_instance->highest_promise,
-                    received_instance->highest_promise),
+                max(local_instance->highest_promised,
+                    received_instance->highest_promised),
                 merge_status(local_instance->status,
                              received_instance->status)
             });
@@ -171,7 +173,7 @@ ref_t<pi_ext_t> build_ring_batch_cmd(
         failed_instances_fields[i][0] =
             pi_t::pro_t::uint_t(body.failed_instances[i].iid);
         failed_instances_fields[i][1] =
-            pi_t::pro_t::uint_t(body.failed_instances[i].highest_promise);
+            pi_t::pro_t::uint_t(body.failed_instances[i].highest_promised);
         failed_instances_fields[i][2] =
             pi_t::pro_t::enum_t(body.failed_instances[i].status);
 

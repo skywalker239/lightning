@@ -20,9 +20,11 @@ enum ring_cmd_type_t {
 };
 
 enum failed_instance_status_t {
+    // instance is open, but ballot_id is to low
     LOW_BALLOT_ID = pi_t::_private + 1,
     RESERVED,
-    IID_TO_LOW
+    IID_TOO_LOW,
+    IID_TOO_HIGH
 };
 
 //! Check pibf blob structure.
@@ -36,7 +38,7 @@ struct ring_cmd_header_t {
 
 struct failed_instance_t {
     instance_id_t iid;
-    ballot_id_t highest_promise;
+    ballot_id_t highest_promised;
     failed_instance_status_t status;
 };
 

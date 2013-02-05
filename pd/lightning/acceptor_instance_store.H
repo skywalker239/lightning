@@ -16,9 +16,15 @@ class acceptor_instance_store_t {
 public:
     virtual ~acceptor_instance_store_t() {}
 
+    enum class err_t {
+        OK,
+        IID_TOO_LOW,
+        IID_TOO_HIGH
+    };
+
     //! Look up the instance iid.
     //  Returns NULL on failure.
-    virtual ref_t<acceptor_instance_t> lookup(instance_id_t iid) = 0;
+    virtual ref_t<acceptor_instance_t> lookup(instance_id_t iid, err_t* err) = 0;
 
     //! Store instance at iid.
     //  Returns false on failure.
