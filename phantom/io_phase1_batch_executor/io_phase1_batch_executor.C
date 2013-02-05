@@ -146,7 +146,7 @@ bool io_phase1_batch_executor_t::accept_one_instance(
     }
 
     failed->iid = iid;
-    return true;
+    return false;
 }
 
 void io_phase1_batch_executor_t::update_and_send_to_next(

@@ -24,8 +24,10 @@
 #pragma GCC visibility push(default)
 namespace phantom {
 
+/**
+ * Phase1 batch executor.
+ */
 class io_phase1_batch_executor_t : public io_t {
-
 public:
     struct config_t : public io_t::config_t {
         host_id_t host_id;
