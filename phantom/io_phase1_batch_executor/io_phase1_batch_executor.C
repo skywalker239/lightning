@@ -34,7 +34,7 @@ void io_phase1_batch_executor_t::init() {}
 void io_phase1_batch_executor_t::start_proposer(instance_id_t start_iid) {
     next_batch_start_ = start_iid;
 
-    proposer_jobs_.start(num_proposer_jobs_);
+    proposer_jobs_count_.started(num_proposer_jobs_);
 
     for(uint32_t i = 0; i < num_proposer_jobs_; ++i) {
         bq_job_t<typeof(&io_phase1_batch_executor_t::run_proposer)>::create(
@@ -47,7 +47,7 @@ void io_phase1_batch_executor_t::start_proposer(instance_id_t start_iid) {
 }
 
 void io_phase1_batch_executor_t::wait_proposer_stop() {
-    proposer_jobs_.wait_for_all_to_finish();
+    proposer_jobs_count_.wait_for_all_to_finish();
 }
 
 ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
@@ -105,7 +105,7 @@ void io_phase1_batch_executor_t::run_proposer() {
         }
     }
 
-    proposer_jobs_.finish();
+    proposer_jobs_count_.finish();
 }
 
 void io_phase1_batch_executor_t::push_to_instance_pool(

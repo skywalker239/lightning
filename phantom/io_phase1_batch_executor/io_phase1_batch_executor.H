@@ -89,7 +89,7 @@ private:
     wait_pool_t cmd_wait_pool_;
     blocking_queue_t<ref_t<pi_ext_t>> received_cmd_queue_;
 
-    finished_counter_t proposer_jobs_;
+    finished_counter_t proposer_jobs_count_;
 
     pending_pool_t* pending_pool_;
     instance_pool_t* instance_pool_;

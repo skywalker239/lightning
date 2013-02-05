@@ -14,7 +14,7 @@ class finished_counter_t {
 public:
     finished_counter_t() : count_(0) {}
 
-    void start(int n);
+    void started(int n);
 
     void finish();
 

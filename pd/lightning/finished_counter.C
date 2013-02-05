@@ -9,7 +9,7 @@
 
 namespace pd {
 
-void finished_counter_t::start(int n) {
+void finished_counter_t::started(int n) {
     assert(n >= 0);
 
     bq_cond_guard_t guard(all_finished_);
