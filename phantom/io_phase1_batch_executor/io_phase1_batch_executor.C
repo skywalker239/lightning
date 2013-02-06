@@ -3,11 +3,12 @@
 // This code may be distributed under the terms of the GNU GPL v3.
 // See ‘http://www.gnu.org/licenses/gpl.html’.
 // vim: set tabstop=4 expandtab:
+#include "io_phase1_batch_executor.H"
+
 #include <limits>
 
 #include <pd/bq/bq_job.H>
 
-#include <phantom/io_phase1_batch_executor/io_phase1_batch_executor.H>
 #include <phantom/module.H>
 
 namespace phantom {
@@ -19,7 +20,7 @@ io_phase1_batch_executor_t::io_phase1_batch_executor_t(
       cmd_wait_pool_(config.wait_pool_size),
       received_cmd_queue_(config.cmd_queue_size),
       pending_pool_(config.pending_pool),
-      instance_pool_(config.instance_pool),
+      proposer_pool_(config.proposer_pool),
       ring_sender_(config.ring_sender),
       request_id_generator_(config.host_id),
       host_id_(config.host_id),
@@ -52,7 +53,10 @@ void io_phase1_batch_executor_t::wait_proposer_stop() {
 
 ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
         instance_id_t batch_start) {
-    for(ballot_id_t ballot = 1; is_master(); ++ballot) {
+    for(ballot_id_t ballot = host_id_;
+        is_master();
+        ballot = next_ballot_id(ballot, host_id_))
+    {
         request_id_t request_id = request_id_generator_.get_guid();
         ring_state_t ring_state = ring_state_snapshot();
 
@@ -96,21 +100,65 @@ void io_phase1_batch_executor_t::run_proposer() {
     while(is_master()) {
         instance_id_t batch_start = next_batch_start_.fetch_add(batch_size_);
 
-        // TODO(prime@): ask instance_pool_t if it ok to run batch
+        if(!proposer_pool_->may_start_batch(batch_start,
+                                            batch_start + batch_size_)) {
+            // proposer_pool deactivated, this host is not master any
+            // more
+            return;
+        }
 
         ref_t<pi_ext_t> reply = propose_batch(batch_start);
 
         if(reply) {
-            push_to_instance_pool(reply);
+            push_to_proposer_pool(reply);
         }
     }
 
     proposer_jobs_count_.finish();
 }
 
-void io_phase1_batch_executor_t::push_to_instance_pool(
-        const ref_t<pi_ext_t>& ) {
-    // TODO(prime@): push to instance pool
+void io_phase1_batch_executor_t::push_to_proposer_pool(
+        const ref_t<pi_ext_t>& ring_reply) {
+    auto failed_instance_ptr = pi_t::array_t::c_ptr_t(
+        failed_instances(ring_reply)
+    );
+
+    for(instance_id_t iid = start_instance_id(ring_reply);
+        iid < end_instance_id(ring_reply);
+        ++iid)
+    {
+        if(failed_instance_ptr &&
+           failed_instance_iid(*failed_instance_ptr) == iid) {
+            switch(failed_instance_status(*failed_instance_ptr)) {
+            case IID_TOO_HIGH:
+                log_warning("phase1 batcher received IID_TOO_HIGH");
+
+                proposer_pool_->push_failed(
+                    iid,
+                    next_ballot_id(ballot_id(ring_reply), host_id_)
+                );
+                break;
+            case LOW_BALLOT_ID:
+            case RESERVED:
+                proposer_pool_->push_failed(
+                    iid,
+                    next_ballot_id(failed_instance_highest_promise(
+                                       *failed_instance_ptr
+                                   ),
+                                   host_id_)
+                );
+                break;
+            case IID_TOO_LOW:
+                // ignore
+                break;
+            default:
+                log_error("unknown failed instance status");
+                break;
+            }
+        } else {
+            proposer_pool_->push_open(iid, ballot_id(ring_reply));
+        }
+    }
 }
 
 bool io_phase1_batch_executor_t::accept_one_instance(
@@ -139,8 +187,11 @@ bool io_phase1_batch_executor_t::accept_one_instance(
             // acceptor make promise and never voted before => success
             return true;
         } else {
-            // something went wrong
-            failed->status = RESERVED;
+            if(highest_voted != kInvalidBallotId) {
+                failed->status = RESERVED;
+            } else {
+                failed->status = LOW_BALLOT_ID;
+            }
             failed->highest_promised = highest_promised;
         }
     }

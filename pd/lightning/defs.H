@@ -23,4 +23,6 @@ typedef uint32_t ring_id_t;
 const ring_id_t kInvalidRingId = 0;
 const host_id_t kInvalidHostId = ~0U;
 
+ballot_id_t next_ballot_id(ballot_id_t old, host_id_t host_id);
+
 }  // namespace pd

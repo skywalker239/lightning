@@ -12,7 +12,6 @@
 #include <pd/lightning/wait_pool.H>
 #include <pd/lightning/blocking_queue.H>
 #include <pd/lightning/pending_pool.H>
-#include <pd/lightning/instance_pool.H>
 #include <pd/lightning/guid.H>
 #include <pd/lightning/finished_counter.H>
 
@@ -20,6 +19,7 @@
 
 #include <phantom/io.H>
 #include <phantom/io_ring_sender/io_ring_sender.H>
+#include <phantom/proposer_pool/proposer_pool.H>
 
 #pragma GCC visibility push(default)
 namespace phantom {
@@ -32,9 +32,9 @@ public:
     struct config_t : public io_t::config_t {
         host_id_t host_id;
 
-        config::objptr_t<pending_pool_t> pending_pool;
+        config::objptr_t<proposer_pool_t> proposer_pool;
         config::objptr_t<io_ring_sender_t> ring_sender;
-        config::objptr_t<instance_pool_t> instance_pool;
+        config::objptr_t<pending_pool_t> pending_pool;
 
         uint32_t wait_pool_size;
         uint32_t cmd_queue_size;
@@ -47,10 +47,10 @@ public:
 
         config_t() throw()
             : host_id(kInvalidHostId),
-              wait_pool_size(64),
-              cmd_queue_size(512),
-              num_proposer_jobs(1),
-              num_acceptor_jobs(1),
+              wait_pool_size(8),
+              cmd_queue_size(128),
+              num_proposer_jobs(4),
+              num_acceptor_jobs(16),
               batch_size(1024) {}
         ~config_t() throw() {}
         void check(const in_t::ptr_t& p) const;
@@ -76,8 +76,8 @@ public:
 private:
     struct ring_state_t {
         ring_state_t()
-            : next_in_the_ring(kInvalidHostId),
-              ring_id(kInvalidRingId),
+            : ring_id(kInvalidRingId),
+              next_in_the_ring(kInvalidHostId),
               is_master(false) {}
 
         ring_id_t ring_id;
@@ -94,7 +94,7 @@ private:
     finished_counter_t proposer_jobs_count_;
 
     pending_pool_t* pending_pool_;
-    instance_pool_t* instance_pool_;
+    proposer_pool_t* proposer_pool_;
     io_ring_sender_t* ring_sender_;
 
     guid_generator_t request_id_generator_;
@@ -110,13 +110,12 @@ private:
     void run_proposer();
     void run_acceptor();
 
-    void wait_becoming_master();
     ring_state_t ring_state_snapshot();
     bool is_master();
 
     ref_t<pi_ext_t> propose_batch(instance_id_t batch_start);
 
-    void push_to_instance_pool(const ref_t<pi_ext_t>& received_cmd);
+    void push_to_proposer_pool(const ref_t<pi_ext_t>& ring_reply);
 
     void accept_batch_cmd(const ref_t<pi_ext_t>& ring_cmd);
 
