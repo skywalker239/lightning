@@ -21,7 +21,7 @@ namespace phantom {
  * Consists of 3 pools.
  *
  * 1) Failed pool - instances for which paxos failed for some
- * reason and must be started over. Stored (iid, ballot_id hint)
+ * reason and must be started over. Stores (iid, ballot_id hint)
  * pairs.
  *
  * 2) Open pool - instances which successfully completed phase1
@@ -37,7 +37,7 @@ namespace phantom {
  * pop_*() push_*() pairs have following semantics:
  *   1) push_*() and pop_*() on active pool may block(for throttling).
  *   2) push_*() on inactive pool return immediately doing nothing.
- *   3) pop_*() on inactive pool return immediately return false leaving
+ *   3) pop_*() on inactive pool return immediately false leaving
  *   other arguments undefined.
  */
 class proposer_pool_t {

@@ -203,10 +203,10 @@ public:
                 dst_host_id: dst_host_id
             },
             {
-                start_instance_id: 1024,
-                end_instance_id: 2048,
+                start_iid: 1024,
+                end_iid: 2048,
                 ballot_id: 7,
-                failed_instances: std::vector<failed_instance_t>()
+                fails: std::vector<batch_fail_t>()
             }
         );
 

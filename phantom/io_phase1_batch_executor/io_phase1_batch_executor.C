@@ -69,10 +69,10 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
                 dst_host_id: host_id_
             },
             {
-                start_instance_id: batch_start,
-                end_instance_id: batch_start + batch_size_,
+                start_iid: batch_start,
+                end_iid: batch_start + batch_size_,
                 ballot_id: ballot,
-                failed_instances: std::vector<failed_instance_t>()
+                fails: std::vector<batch_fail_t>()
             }
         ));
 
@@ -83,14 +83,12 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
             return reply; // received reply from ring
         }
 
-        if(ballot >= 256 && ballot % 256 == 0) {
+        if(ballot >= 1024 * 64) {
             log_warning("ballot for batch [%ld, %ld) grow to %d",
                         batch_start,
                         batch_start + batch_size_,
                         ballot);
         }
-
-        assert(ballot != std::numeric_limits<ballot_id_t>::max());
     }
 
     return NULL;
@@ -119,44 +117,41 @@ void io_phase1_batch_executor_t::run_proposer() {
 
 void io_phase1_batch_executor_t::push_to_proposer_pool(
         const ref_t<pi_ext_t>& ring_reply) {
-    auto failed_instance_ptr = pi_t::array_t::c_ptr_t(
-        failed_instances(ring_reply)
-    );
+    auto fail_ptr = pi_t::array_t::c_ptr_t(batch_fails(ring_reply));
 
-    for(instance_id_t iid = start_instance_id(ring_reply);
-        iid < end_instance_id(ring_reply);
+    for(instance_id_t iid = batch_start_iid(ring_reply);
+        iid < batch_end_iid(ring_reply);
         ++iid)
     {
-        if(failed_instance_ptr &&
-           failed_instance_iid(*failed_instance_ptr) == iid) {
-            switch(failed_instance_status(*failed_instance_ptr)) {
+        if(fail_ptr && fail_iid(*fail_ptr) == iid) {
+            switch(fail_status(*fail_ptr)) {
             case IID_TOO_HIGH:
-                log_warning("phase1 batcher received IID_TOO_HIGH");
+                log_warning("received IID_TOO_HIGH");
 
                 proposer_pool_->push_failed(
                     iid,
-                    next_ballot_id(ballot_id(ring_reply), host_id_)
+                    next_ballot_id(batch_ballot_id(ring_reply), host_id_)
                 );
                 break;
             case LOW_BALLOT_ID:
             case RESERVED:
                 proposer_pool_->push_failed(
                     iid,
-                    next_ballot_id(failed_instance_highest_promise(
-                                       *failed_instance_ptr
-                                   ),
-                                   host_id_)
+                    next_ballot_id(fail_highest_promise(*fail_ptr), host_id_)
                 );
                 break;
             case IID_TOO_LOW:
-                // ignore
+                log_warning("batcher received IID_TOO_LOW");
+                break;
+            case OPEN:
+                log_error("batcher received OPEN");
                 break;
             default:
-                log_error("unknown failed instance status");
+                log_error("batcher received unknown instance status");
                 break;
             }
         } else {
-            proposer_pool_->push_open(iid, ballot_id(ring_reply));
+            proposer_pool_->push_open(iid, batch_ballot_id(ring_reply));
         }
     }
 }
@@ -164,14 +159,14 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
 bool io_phase1_batch_executor_t::accept_one_instance(
         instance_id_t iid,
         ballot_id_t ballot_id,
-        failed_instance_t* failed) {
+        batch_fail_t* fail) {
     acceptor_instance_store_t::err_t err;
     ref_t<acceptor_instance_t> instance = pending_pool_->lookup(iid, &err);
 
     if(err == acceptor_instance_store_t::err_t::IID_TOO_LOW) {
-        failed->status = IID_TOO_LOW;
+        fail->status = IID_TOO_LOW;
     } else if(err == acceptor_instance_store_t::err_t::IID_TOO_HIGH) {
-        failed->status = IID_TOO_HIGH;
+        fail->status = IID_TOO_HIGH;
     } else {
         assert(instance); // not low, not high, must be ok
 
@@ -188,24 +183,24 @@ bool io_phase1_batch_executor_t::accept_one_instance(
             return true;
         } else {
             if(highest_voted != kInvalidBallotId) {
-                failed->status = RESERVED;
+                fail->status = RESERVED;
             } else {
-                failed->status = LOW_BALLOT_ID;
+                fail->status = LOW_BALLOT_ID;
             }
-            failed->highest_promised = highest_promised;
+            fail->highest_promised = highest_promised;
         }
     }
 
-    failed->iid = iid;
+    fail->iid = iid;
     return false;
 }
 
 void io_phase1_batch_executor_t::update_and_send_to_next(
         const ref_t<pi_ext_t>& received_cmd,
-        const std::vector<failed_instance_t>& localy_failed) {
-    std::vector<failed_instance_t> all_failed = merge_failed_instances(
+        const std::vector<batch_fail_t>& localy_failed) {
+    std::vector<batch_fail_t> all_failed = merge_fails(
         localy_failed,
-        failed_instances_pi_to_vector(failed_instances(received_cmd))
+        fails_pi_to_vector(batch_fails(received_cmd))
     );
 
     ring_state_t ring_state = ring_state_snapshot();
@@ -221,29 +216,29 @@ void io_phase1_batch_executor_t::update_and_send_to_next(
             dst_host_id: ring_state.next_in_the_ring
         },
         {
-            start_instance_id: start_instance_id(received_cmd),
-            end_instance_id: end_instance_id(received_cmd),
-            ballot_id: ballot_id(received_cmd),
-            failed_instances: all_failed
+            start_iid: batch_start_iid(received_cmd),
+            end_iid: batch_end_iid(received_cmd),
+            ballot_id: batch_ballot_id(received_cmd),
+            fails: all_failed
         }
     ));
 }
 
 void io_phase1_batch_executor_t::accept_batch_cmd(const ref_t<pi_ext_t>& ring_cmd) {
-    std::vector<failed_instance_t> failed;
+    std::vector<batch_fail_t> all_failed;
 
-    for(instance_id_t iid = start_instance_id(ring_cmd);
-        iid < end_instance_id(ring_cmd);
+    for(instance_id_t iid = batch_start_iid(ring_cmd);
+        iid < batch_end_iid(ring_cmd);
         ++iid)
     {
-        failed_instance_t fail;
+        batch_fail_t fail;
 
-        if(!accept_one_instance(iid, ballot_id(ring_cmd), &fail)) {
-            failed.push_back(fail);
+        if(!accept_one_instance(iid, batch_ballot_id(ring_cmd), &fail)) {
+            all_failed.push_back(fail);
         }
     }
 
-    update_and_send_to_next(ring_cmd, failed);
+    update_and_send_to_next(ring_cmd, all_failed);
 }
 
 void io_phase1_batch_executor_t::run_acceptor() {

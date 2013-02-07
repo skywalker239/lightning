@@ -126,7 +126,7 @@ private:
         static const int QUEUE_SIZE = 8,
                          N_READERS = 50, N_WRITERS = 50,
                          // per one reader / writer
-                         N_WRITES = 1000, N_READS = 1000;
+                         N_WRITES = 10000, N_READS = 10000;
         ASSERT(N_READERS * N_READS == N_WRITERS * N_WRITES);
 
         blocking_queue_t<int> queue(QUEUE_SIZE);
@@ -259,10 +259,10 @@ private:
                 dst_host_id: 12
             },
             {
-                start_instance_id: 1024,
-                end_instance_id: 2048,
+                start_iid: 1024,
+                end_iid: 2048,
                 ballot_id: 7,
-                failed_instances: std::vector<failed_instance_t>()
+                fails: std::vector<batch_fail_t>()
             }
         );
 
@@ -272,15 +272,15 @@ private:
         ASSERT(ring_id(cmd) == 21);
         ASSERT(dst_host_id(cmd) == 12);
 
-        ASSERT(start_instance_id(cmd) == 1024);
-        ASSERT(end_instance_id(cmd) == 2048);
-        ASSERT(ballot_id(cmd) == 7);
+        ASSERT(batch_start_iid(cmd) == 1024);
+        ASSERT(batch_end_iid(cmd) == 2048);
+        ASSERT(batch_ballot_id(cmd) == 7);
 
-        ASSERT(failed_instances(cmd)._count() == 0);
+        ASSERT(batch_fails(cmd)._count() == 0);
     }
 
     void test_batch_ring_cmd() {
-        std::vector<failed_instance_t> failed{
+        std::vector<batch_fail_t> failed{
             { 1050, 9, LOW_BALLOT_ID },
             { 1051, 10, RESERVED },
             { 1052, 11, IID_TOO_LOW }
@@ -293,10 +293,10 @@ private:
                 dst_host_id: 12
             },
             {
-                start_instance_id: 1024,
-                end_instance_id: 2048,
+                start_iid: 1024,
+                end_iid: 2048,
                 ballot_id: 7,
-                failed_instances: failed
+                fails: failed
             }
         );
 
@@ -306,12 +306,11 @@ private:
         ASSERT(ring_id(cmd) == 21);
         ASSERT(dst_host_id(cmd) == 12);
 
-        ASSERT(start_instance_id(cmd) == 1024);
-        ASSERT(end_instance_id(cmd) == 2048);
-        ASSERT(ballot_id(cmd) == 7);
+        ASSERT(batch_start_iid(cmd) == 1024);
+        ASSERT(batch_end_iid(cmd) == 2048);
+        ASSERT(batch_ballot_id(cmd) == 7);
 
-        std::vector<failed_instance_t> fi =
-            failed_instances_pi_to_vector(failed_instances(cmd));
+        std::vector<batch_fail_t> fi = fails_pi_to_vector(batch_fails(cmd));
 
         ASSERT(fi[0].iid == 1050);
         ASSERT(fi[0].highest_promised == 9);
