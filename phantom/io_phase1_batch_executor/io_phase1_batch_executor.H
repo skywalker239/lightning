@@ -20,14 +20,17 @@
 #include <phantom/io.H>
 #include <phantom/io_ring_sender/io_ring_sender.H>
 #include <phantom/proposer_pool/proposer_pool.H>
+#include <phantom/ring_handler/ring_handler.H>
 
 #pragma GCC visibility push(default)
 namespace phantom {
 
 /**
  * Phase1 batch executor.
+ *
+ *
  */
-class io_phase1_batch_executor_t : public io_t {
+class io_phase1_batch_executor_t : public ring_handler_t, public io_t {
 public:
     struct config_t : public io_t::config_t {
         host_id_t host_id;
@@ -59,7 +62,7 @@ public:
     io_phase1_batch_executor_t(const string_t& name,
                                const config_t& config);
 
-    void handle_cmd(const ref_t<pi_ext_t>& ring_cmd);
+    virtual void handle_cmd(const ref_t<pi_ext_t>& ring_cmd);
 
     void ring_state_changed(ring_id_t ring_id,
                             host_id_t next_in_the_ring,
