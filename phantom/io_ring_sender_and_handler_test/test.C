@@ -13,6 +13,7 @@
 #include <pd/bq/bq_util.H>
 #include <pd/base/thr.H>
 #include <pd/base/log.H>
+#include <pd/base/assert.H>
 #include <pd/lightning/pi_ext.H>
 #include <pd/lightning/pi_ring_cmd.H>
 
@@ -25,17 +26,6 @@
 namespace phantom {
 
 MODULE(io_ring_sender_and_handler_test);
-
-#ifdef ASSERT
-#error ***ASSERT macros already defined***
-#endif
-
-#define ASSERT(value) \
-do { \
-  if (!(value)) { \
-    log_error("FAIL %s in %s:%d", __func__, __FILE__, __LINE__); \
-  } \
-} while(0) \
 
 struct test_ring_handler_t : public ring_handler_t {
     struct config_t {
@@ -155,8 +145,8 @@ public:
         sleep();
         sender_->exit_ring();
 
-        ASSERT(proto1_handler_->size() == 1);
-        ASSERT(proto2_handler_->size() == 1);
+        assert(proto1_handler_->size() == 1);
+        assert(proto2_handler_->size() == 1);
     }
 
     void test_ring_sender_exit_ring() {
@@ -176,7 +166,7 @@ public:
         sender_->send(build_cmd(30, kProto1Host));
         sleep();
 
-        ASSERT(proto1_handler_->size() == 1);
+        assert(proto1_handler_->size() == 1);
     }
 
     void test_ring_handler_ignores_cmds_with_wrong_dst() {
@@ -192,7 +182,7 @@ public:
         sender_->send(build_cmd(31, kProto1Host + 1));
 
         sleep();
-        ASSERT(proto1_handler_->size() == 0);
+        assert(proto1_handler_->size() == 0);
     }
 
     ref_t<pi_ext_t> build_cmd(ring_id_t ring_id, host_id_t dst_host_id) {
@@ -255,7 +245,5 @@ config_binding_value(io_ring_sender_and_handler_test_t, proto2_handler);
 config_binding_parent(io_ring_sender_and_handler_test_t, io_t, 1);
 config_binding_ctor(io_t, io_ring_sender_and_handler_test_t);
 } // namespace io_ring_sender
-
-#undef ASSERT
 
 } // namespace phantom

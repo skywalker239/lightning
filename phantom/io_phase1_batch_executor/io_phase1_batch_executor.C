@@ -13,6 +13,10 @@
 
 namespace phantom {
 
+void io_phase1_batch_executor_t::config_t::check(const in_t::ptr_t& ) const {
+//    TODO(prime@): sanitize config
+}
+
 io_phase1_batch_executor_t::io_phase1_batch_executor_t(
         const string_t& name,
         const config_t& config)

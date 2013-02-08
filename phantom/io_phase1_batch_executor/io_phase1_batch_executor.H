@@ -28,7 +28,7 @@ namespace phantom {
 /**
  * Phase1 batch executor.
  *
- *
+ * 
  */
 class io_phase1_batch_executor_t : public ring_handler_t, public io_t {
 public:
@@ -64,12 +64,25 @@ public:
 
     virtual void handle_cmd(const ref_t<pi_ext_t>& ring_cmd);
 
+    /**
+     * Must be called to nofity executor that ring was changed.
+     *
+     * If is_master == false stops proposer jobs. Caller must then
+     * call wait_proposer_stop().
+     */
     void ring_state_changed(ring_id_t ring_id,
                             host_id_t next_in_the_ring,
                             bool is_master);
 
+    /**
+     * Wait for all proposer jobs to finish.
+     */
     void wait_proposer_stop();
 
+    /**
+     * Start batching from start_iid, proposer must be stopped before
+     * this call.
+     */
     void start_proposer(instance_id_t start_iid);
 
     virtual void init();
