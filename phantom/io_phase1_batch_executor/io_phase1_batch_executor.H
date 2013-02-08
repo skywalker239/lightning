@@ -4,8 +4,6 @@
 // This code may be distributed under the terms of the GNU GPL v3.
 // See ‘http://www.gnu.org/licenses/gpl.html’.
 // vim: set tabstop=4 expandtab:
-#include <atomic>
-
 #include <pd/lightning/defs.H>
 #include <pd/lightning/pi_ext.H>
 #include <pd/lightning/pi_ring_cmd.H>
@@ -15,7 +13,8 @@
 #include <pd/lightning/guid.H>
 #include <pd/lightning/finished_counter.H>
 
-#include <pd/bq/bq_cond.H>
+#include <pd/bq/bq_mutex.H>
+#include <pd/bq/thr.H>
 
 #include <phantom/io.H>
 #include <phantom/io_ring_sender/io_ring_sender.H>
@@ -52,8 +51,8 @@ public:
             : host_id(kInvalidHostId),
               wait_pool_size(8),
               cmd_queue_size(128),
-              num_proposer_jobs(4),
-              num_acceptor_jobs(16),
+              num_proposer_jobs(32),
+              num_acceptor_jobs(32),
               batch_size(1024) {}
         ~config_t() throw() {}
         void check(const in_t::ptr_t& p) const;
@@ -102,7 +101,7 @@ private:
     };
 
     ring_state_t ring_state_;
-    pd::bq_cond_t ring_state_changed_;
+    thr::spinlock_t ring_state_lock_;
 
     wait_pool_t cmd_wait_pool_;
     blocking_queue_t<ref_t<pi_ext_t>> received_cmd_queue_;
@@ -121,13 +120,16 @@ private:
     const uint32_t batch_size_;
     const interval_t ring_reply_timeout_;
 
-    std::atomic<instance_id_t> next_batch_start_;
+    instance_id_t next_batch_start_;
+    bq_mutex_t next_batch_start_lock_;
 
     void run_proposer();
     void run_acceptor();
 
     ring_state_t ring_state_snapshot();
     bool is_master();
+
+    bool next_batch_start(instance_id_t* start);
 
     ref_t<pi_ext_t> propose_batch(instance_id_t batch_start);
 

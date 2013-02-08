@@ -37,6 +37,8 @@ io_phase1_batch_executor_t::io_phase1_batch_executor_t(
 void io_phase1_batch_executor_t::init() {}
 
 void io_phase1_batch_executor_t::start_proposer(instance_id_t start_iid) {
+    wait_proposer_stop();
+
     next_batch_start_ = start_iid;
 
     proposer_jobs_count_.started(num_proposer_jobs_);
@@ -70,7 +72,7 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
             {
                 request_id: request_id,
                 ring_id: ring_state.ring_id,
-                dst_host_id: host_id_
+                dst_host_id: host_id_  // sending to local acceptor
             },
             {
                 start_iid: batch_start,
@@ -87,7 +89,7 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
             return reply; // received reply from ring
         }
 
-        if(ballot >= 1024 * 64) {
+        if(ballot >= 1024 * kMaxHostId) {
             log_warning("ballot for batch [%ld, %ld) grow to %d",
                         batch_start,
                         batch_start + batch_size_,
@@ -98,14 +100,22 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
     return NULL;
 }
 
+bool io_phase1_batch_executor_t::next_batch_start(instance_id_t* start) {
+    bq_mutex_guard_t guard(next_batch_start_lock_);
+
+    *start = next_batch_start_;
+    next_batch_start_ += batch_size_;
+
+    // calling under lock, so batch intervals are strongly increasing
+    return proposer_pool_->may_start_batch(*start, next_batch_start_);
+}
+
 void io_phase1_batch_executor_t::run_proposer() {
     while(is_master()) {
-        instance_id_t batch_start = next_batch_start_.fetch_add(batch_size_);
+        instance_id_t batch_start;
 
-        if(!proposer_pool_->may_start_batch(batch_start,
-                                            batch_start + batch_size_)) {
-            // proposer_pool deactivated, this host is not master any
-            // more
+        if(!next_batch_start(&batch_start)) {
+            // this host is not master any more
             return;
         }
 
@@ -154,6 +164,8 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
                 log_error("batcher received unknown instance status");
                 break;
             }
+
+            ++fail_ptr;
         } else {
             proposer_pool_->push_open(iid, batch_ballot_id(ring_reply));
         }
@@ -280,12 +292,12 @@ void io_phase1_batch_executor_t::handle_cmd(const ref_t<pi_ext_t>& ring_cmd) {
 }
 
 bool io_phase1_batch_executor_t::is_master() {
-    bq_cond_guard_t ring_state_guard(ring_state_changed_);
+    thr::spinlock_guard_t ring_state_guard(ring_state_lock_);
     return ring_state_.is_master;
 }
 
 io_phase1_batch_executor_t::ring_state_t io_phase1_batch_executor_t::ring_state_snapshot() {
-    bq_cond_guard_t ring_state_guard(ring_state_changed_);
+    thr::spinlock_guard_t ring_state_guard(ring_state_lock_);
     return ring_state_;
 }
 

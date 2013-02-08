@@ -15,7 +15,7 @@ namespace phantom {
 class io_guid_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
-        int host_id;
+        host_id_t host_id;
 
         config_t() throw();
         ~config_t() throw() {};

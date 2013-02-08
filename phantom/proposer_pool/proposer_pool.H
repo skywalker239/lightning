@@ -34,17 +34,15 @@ namespace phantom {
  *
  * Can be ether in active or inactive state.
  *
- * pop_*() push_*() pairs have following semantics:
- *   1) push_*() and pop_*() on active pool may block(for throttling).
- *   2) push_*() on inactive pool return immediately doing nothing.
- *   3) pop_*() on inactive pool return immediately false leaving
- *   other arguments undefined.
+ * 1) push_*() on inactive pool return immediately doing nothing.
+ * 2) pop_*() on inactive pool return immediately false leaving
+ *    other arguments undefined.
  */
 class proposer_pool_t {
 public:
-    bool may_start_batch(instance_id_t batch_start, instance_id_t batch_end);
+    bool may_start_batch(instance_id_t start, instance_id_t end);
 
-    void activate();
+    void activate(instance_id_t start);
 
     void deactivate();
 

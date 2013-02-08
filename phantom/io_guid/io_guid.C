@@ -12,17 +12,17 @@ namespace phantom {
 MODULE(io_guid);
 
 io_guid_t::config_t::config_t() throw()
-    : host_id(-1)
+    : host_id(kInvalidHostId)
 {}
 
 void io_guid_t::config_t::check(const in_t::ptr_t& p) const {
     io_t::config_t::check(p);
 
-    if(host_id == -1) {
+    if(host_id == kInvalidHostId) {
         config::error(p, "host_id must be set");
     }
 
-    if(host_id > 1 << 12) {
+    if(host_id > kMaxHostId) {
         config::error(p, "host_id is to big");
     }
 }
