@@ -27,6 +27,7 @@ $(eval $(call MODULE,io_phase1_batch_executor,,pi lightning,))
 # test modules
 $(eval $(call MODULE,test_pd_lightning,,pi lightning,))
 $(eval $(call MODULE,test_ring,,pi lightning,))
+$(eval $(call MODULE,test_executors,,pi lightning,))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude
 
