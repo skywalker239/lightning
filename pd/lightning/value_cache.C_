@@ -31,14 +31,19 @@ ref_t<acceptor_instance_t> value_cache_t::lookup(instance_id_t iid) {
     return instance;
 }
 
+void set_snapshot_version(instance_id_t version) {
+    assert(version >= snapshot_version_);
+
+    thr::spinlock_guard_t guard(lock_);
+    snapshot_version_ = version;
+}
+
 bool value_cache_t::store(instance_id_t iid,
                           ref_t<acceptor_instance_t> instance)
 {
-    assert(iid = instance->instance_id());
+    assert(iid == instance->instance_id());
     assert(instance->committed());
-    snapshot_.update();
 
-    const instance_id_t snapshot_version = snapshot_.snapshot_version();
     const size_t array_index = iid % cache_size_;
 
     thr::spinlock_guard_t guard(lock_);

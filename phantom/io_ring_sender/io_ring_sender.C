@@ -69,6 +69,10 @@ void io_ring_sender_t::exit_ring() {
     cmd_queue_.deactivate();
 }
 
+void io_ring_sender_t::stat(out_t&, bool) {
+    // TODO(prime@): write stat
+}
+
 namespace io_ring_sender {
 config_binding_sname(io_ring_sender_t);
 config_binding_value(io_ring_sender_t, queue_size);

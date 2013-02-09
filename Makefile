@@ -5,17 +5,20 @@ include /usr/share/phantom/library.mk
 $(eval $(call LIBRARY,pi))
 $(eval $(call LIBRARY,lightning))
 $(eval $(call LIBRARY,zookeeper))
+$(eval $(call LIBRARY,zk_vars))
 
 include /usr/share/phantom/module.mk
 
 $(eval $(call MODULE,io_blob_sender,,pi lightning,))
-$(eval $(call MODULE,io_zclient,,,))
-$(eval $(call MODULE,io_toy_zk_client,,pi lightning,))
-$(eval $(call MODULE,io_zhandle,,,zookeeper_mt))
-$(eval $(call MODULE,io_zcluster_status,,zookeeper,))
-$(eval $(call MODULE,io_zconf,,pi lightning,))
-$(eval $(call MODULE,io_zmaster,,lightning,))
-$(eval $(call MODULE,io_transport_config,,pi lightning,))
+
+#$(eval $(call MODULE,io_zclient,,,))
+#$(eval $(call MODULE,io_toy_zk_client,,pi lightning,))
+#$(eval $(call MODULE,io_zhandle,,,zookeeper_mt))
+#$(eval $(call MODULE,io_zcluster_status,,zookeeper,))
+#$(eval $(call MODULE,io_zconf,,pi lightning,))
+#$(eval $(call MODULE,io_zmaster,,lightning,))
+#$(eval $(call MODULE,io_transport_config,,pi lightning,))
+
 $(eval $(call MODULE,io_guid,,lightning,))
 
 $(eval $(call MODULE,io_ring_sender,,pi lightning,))

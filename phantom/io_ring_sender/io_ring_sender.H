@@ -14,7 +14,6 @@
 #include <pd/lightning/blocking_queue.H>
 
 #include <phantom/io.H>
-#include <phantom/io_transport_config/io_transport_config.H>
 #include <phantom/io_ring_sender/ring_link.H>
 
 #pragma GCC visibility push(default)
@@ -63,8 +62,7 @@ public:
     virtual void run();
     virtual void fini();
 
-    virtual void stat(out_t&, bool) { /* TODO(prime@) */ }
-
+    virtual void stat(out_t&, bool);
 private:
     blocking_queue_t<ref_t<pi_ext_t>> cmd_queue_;
 
@@ -73,10 +71,6 @@ private:
     size_t number_of_connections_;
     size_t obuf_size_;
     interval_t net_timeout_;
-
-    void shutdown_links();
-
-    void start_links(const ring_var_t& ring);
 };
 
 }

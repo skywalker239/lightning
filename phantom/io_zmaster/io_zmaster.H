@@ -9,7 +9,7 @@
 
 #include <pd/bq/bq_cond.H>
 
-#include <pd/lightning/simple_var.H>
+#include <pd/zk_vars/simple_var.H>
 
 #include <phantom/io_zconf/io_zconf.H>
 #include <phantom/io_zclient/io_zclient.H>
