@@ -6,6 +6,7 @@
 #pragma once
 
 #include <pd/lightning/defs.H>
+#include <pd/lightning/value.H>
 
 #include <phantom/pd.H>
 
