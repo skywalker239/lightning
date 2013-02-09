@@ -25,7 +25,7 @@
 
 namespace phantom {
 
-MODULE(io_pd_lightning_test);
+MODULE(test_pd_lightning);
 
 class io_pd_lightning_test_t : public io_t {
 public:

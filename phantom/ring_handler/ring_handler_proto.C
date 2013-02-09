@@ -18,10 +18,6 @@ namespace phantom {
 MODULE(ring_handler);
 
 void ring_handler_proto_t::config_t::check(const in_t::ptr_t& p) const {
-    if(this_host_id == kInvalidHostId) {
-        config::error(p, "ring_handler_proto_t.this_host_id must be set");
-    }
-
     if(!phase1_batch_handler) {
         config::error(p, "ring_handler_proto_t.phase1_batch_handler required");
     }
@@ -41,14 +37,9 @@ void ring_handler_proto_t::stat(out_t& /*out*/, bool /*clear*/) {
 
 ring_handler_proto_t::ring_handler_proto_t(const string_t&,
                                            const config_t& config)
-    : this_host_id_(config.this_host_id),
-      phase1_batch_handler_(config.phase1_batch_handler),
+    : phase1_batch_handler_(config.phase1_batch_handler),
       phase1_handler_(config.phase1_handler),
-      phase2_handler_(config.phase2_handler),
-      current_ring_(kInvalidRingId) {
-    // check that std::atomic<ring_id_t> provides lock-free synchronization
-    assert(current_ring_.is_lock_free());
-}
+      phase2_handler_(config.phase2_handler) {}
 
 
 bool ring_handler_proto_t::request_proc(in_t::ptr_t& in_ptr,
@@ -69,17 +60,6 @@ bool ring_handler_proto_t::request_proc(in_t::ptr_t& in_ptr,
         return false;
     }
 
-    if(ring_id(ring_cmd) != current_ring_ ||
-       dst_host_id(ring_cmd) != this_host_id_) {
-        log_debug("wrong dst in ring cmd { ring_id = %d, dst_host_id = %d }",
-                  ring_id(ring_cmd),
-                  dst_host_id(ring_cmd));
-        // When ring changes some commands may be sent to wrong host.
-        // If we close connection here it may cause lot of unnecessary
-        // reconnections.
-        return true;
-    }
-
     switch(ring_cmd_type(ring_cmd)) {
       case PHASE1_BATCH:
         phase1_batch_handler_->handle_cmd(ring_cmd);
@@ -98,13 +78,8 @@ bool ring_handler_proto_t::request_proc(in_t::ptr_t& in_ptr,
     return true;
 }
 
-void ring_handler_proto_t::ring_changed(ring_id_t new_ring) {
-    current_ring_ = new_ring;
-}
-
 namespace ring_handler_proto {
 config_binding_sname(ring_handler_proto_t);
-config_binding_value(ring_handler_proto_t, this_host_id);
 
 config_binding_type(ring_handler_proto_t, ring_handler_t);
 

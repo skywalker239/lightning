@@ -25,7 +25,7 @@
 
 namespace phantom {
 
-MODULE(io_ring_sender_and_handler_test);
+MODULE(test_ring);
 
 struct test_ring_handler_t : public ring_handler_t {
     struct config_t {
@@ -91,7 +91,6 @@ public:
           proto2_handler_(c.proto2_handler) {}
 
     virtual void run() {
-        test_ring_handler_ignores_cmds_with_wrong_dst();
         test_ring_sender_ring_switch();
         test_ring_sender_exit_ring();
 		test_stress();
@@ -108,9 +107,6 @@ public:
             uint16_t port = ring_id % 2 == 0 ? kProto1Port : kProto2Port;
             host_id_t host = ring_id % 2 == 0 ? kProto1Host : kProto2Host;
 
-            proto1_->ring_changed(ring_id);
-            proto2_->ring_changed(ring_id);
-
             sender_->join_ring(
                 netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
                                port));
@@ -124,7 +120,6 @@ public:
     void test_ring_sender_ring_switch() {
         reset_all();
 
-        proto1_->ring_changed(30);
         sender_->join_ring(
             netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
                            kProto1Port));
@@ -134,7 +129,6 @@ public:
         sender_->exit_ring();
         sleep();
 
-        proto2_->ring_changed(31);
         sender_->join_ring(
             netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
                            kProto2Port));
@@ -152,8 +146,6 @@ public:
     void test_ring_sender_exit_ring() {
         reset_all();
 
-        proto1_->ring_changed(30);
-
         sender_->join_ring(
             netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
                            kProto1Port));
@@ -167,22 +159,6 @@ public:
         sleep();
 
         assert(proto1_handler_->size() == 1);
-    }
-
-    void test_ring_handler_ignores_cmds_with_wrong_dst() {
-        reset_all();
-
-        proto1_->ring_changed(30);
-        sender_->join_ring(
-            netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
-                           kProto1Port));
-
-        sender_->send(build_cmd(31, kProto1Host));
-        sender_->send(build_cmd(30, kProto1Host + 1));
-        sender_->send(build_cmd(31, kProto1Host + 1));
-
-        sleep();
-        assert(proto1_handler_->size() == 0);
     }
 
     ref_t<pi_ext_t> build_cmd(ring_id_t ring_id, host_id_t dst_host_id) {
@@ -205,8 +181,6 @@ public:
 
     void reset_all() {
         sender_->exit_ring();
-        proto1_->ring_changed(kInvalidRingId);
-        proto2_->ring_changed(kInvalidRingId);
 
         sleep();
 
