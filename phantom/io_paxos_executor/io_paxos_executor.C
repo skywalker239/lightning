@@ -25,8 +25,8 @@ io_paxos_executor_t::io_paxos_executor_t(const string_t& name,
       received_cmd_queue_(config.cmd_queue_size),
       host_id_(config.host_id),
       num_proposer_jobs_(config.num_proposer_jobs),
-      num_acceptor_jobs_(config.num_acceptor_jobs)
-{}
+      num_acceptor_jobs_(config.num_acceptor_jobs),
+      ring_reply_timeout_(config.ring_reply_timeout) {}
 
 void io_paxos_executor_t::init() {}
 

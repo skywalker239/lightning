@@ -80,11 +80,13 @@ protected:
 
     wait_pool_t cmd_wait_pool_;
     blocking_queue_t<ref_t<pi_ext_t>> received_cmd_queue_;
+
     finished_counter_t proposer_jobs_count_;
 
     const host_id_t host_id_;
     const uint32_t num_proposer_jobs_;
     const uint32_t num_acceptor_jobs_;
+    const interval_t ring_reply_timeout_;
 
     virtual void run_proposer() = 0;
     virtual void run_acceptor() = 0;
