@@ -21,6 +21,7 @@ $(eval $(call MODULE,io_ring_sender,,pi lightning,))
 $(eval $(call MODULE,ring_handler,,pi lightning,))
 
 $(eval $(call MODULE,io_paxos_executor,,pi lightning zookeeper,))
+$(eval $(call MODULE,io_phase1_batch_executor,,pi lightning zookeeper,))
 
 # test modules
 $(eval $(call MODULE,io_pd_lightning_test,,pi lightning,))

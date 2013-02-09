@@ -13,6 +13,8 @@
 
 namespace phantom {
 
+MODULE(io_phase1_batch_executor);
+
 void io_phase1_batch_executor_t::config_t::check(const in_t::ptr_t& ) const {
 //    TODO(prime@): sanitize config
 }
@@ -20,42 +22,8 @@ void io_phase1_batch_executor_t::config_t::check(const in_t::ptr_t& ) const {
 io_phase1_batch_executor_t::io_phase1_batch_executor_t(
         const string_t& name,
         const config_t& config)
-    : io_t(name, config),
-      cmd_wait_pool_(config.wait_pool_size),
-      received_cmd_queue_(config.cmd_queue_size),
-      pending_pool_(config.pending_pool),
-      proposer_pool_(config.proposer_pool),
-      ring_sender_(config.ring_sender),
-      request_id_generator_(config.host_id),
-      host_id_(config.host_id),
-      num_proposer_jobs_(config.num_proposer_jobs),
-      num_acceptor_jobs_(config.num_acceptor_jobs),
-      batch_size_(config.batch_size),
-      ring_reply_timeout_(config.ring_reply_timeout) {}
-
-
-void io_phase1_batch_executor_t::init() {}
-
-void io_phase1_batch_executor_t::start_proposer(instance_id_t start_iid) {
-    wait_proposer_stop();
-
-    next_batch_start_ = start_iid;
-
-    proposer_jobs_count_.started(num_proposer_jobs_);
-
-    for(uint32_t i = 0; i < num_proposer_jobs_; ++i) {
-        bq_job_t<typeof(&io_phase1_batch_executor_t::run_proposer)>::create(
-            STRING("io_phase1_batch_executor_t::run_proposer"),
-            bq_thr_get(),
-            *this,
-            &io_phase1_batch_executor_t::run_proposer
-        );
-    }
-}
-
-void io_phase1_batch_executor_t::wait_proposer_stop() {
-    proposer_jobs_count_.wait_for_all_to_finish();
-}
+    : io_paxos_executor_t(name, config),
+      batch_size_(config.batch_size) {}
 
 ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
         instance_id_t batch_start) {
@@ -63,12 +31,12 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
         is_master();
         ballot = next_ballot_id(ballot, host_id_))
     {
-        request_id_t request_id = request_id_generator_.get_guid();
+        request_id_t request_id = request_id_generator_->generator().get_guid();
         ring_state_t ring_state = ring_state_snapshot();
 
         wait_pool_t::item_t wait_reply(cmd_wait_pool_, request_id);
 
-        accept_batch_cmd(build_ring_batch_cmd(
+        accept_ring_cmd(build_ring_batch_cmd(
             {
                 request_id: request_id,
                 ring_id: ring_state.ring_id,
@@ -229,7 +197,7 @@ void io_phase1_batch_executor_t::update_and_send_to_next(
         {
             request_id: request_id(received_cmd),
             ring_id: ring_id(received_cmd),
-            dst_host_id: ring_state.next_in_the_ring
+            dst_host_id: ring_state.next_in_ring
         },
         {
             start_iid: batch_start_iid(received_cmd),
@@ -240,7 +208,7 @@ void io_phase1_batch_executor_t::update_and_send_to_next(
     ));
 }
 
-void io_phase1_batch_executor_t::accept_batch_cmd(const ref_t<pi_ext_t>& ring_cmd) {
+void io_phase1_batch_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
     std::vector<batch_fail_t> all_failed;
 
     for(instance_id_t iid = batch_start_iid(ring_cmd);
@@ -262,43 +230,8 @@ void io_phase1_batch_executor_t::run_acceptor() {
         ref_t<pi_ext_t> ring_cmd;
         received_cmd_queue_.pop(&ring_cmd);
 
-        accept_batch_cmd(ring_cmd);
+        accept_ring_cmd(ring_cmd);
     }
-}
-
-void io_phase1_batch_executor_t::run() {
-    for(uint32_t i = 0; i < num_acceptor_jobs_; ++i) {
-        bq_job_t<typeof(&io_phase1_batch_executor_t::run_acceptor)>::create(
-            STRING("io_phase1_batch_executor_t::run_acceptor"),
-            bq_thr_get(),
-            *this,
-            &io_phase1_batch_executor_t::run_acceptor
-        );
-    }
-}
-
-void io_phase1_batch_executor_t::fini() {}
-
-void io_phase1_batch_executor_t::handle_cmd(const ref_t<pi_ext_t>& ring_cmd) {
-    if(is_master()) {
-        ref_t<wait_pool_t::data_t> data = cmd_wait_pool_.lookup(request_id(ring_cmd));
-
-        if(data) {
-            data->send(ring_cmd);
-        }
-    } else {
-        received_cmd_queue_.push(ring_cmd);
-    }
-}
-
-bool io_phase1_batch_executor_t::is_master() {
-    thr::spinlock_guard_t ring_state_guard(ring_state_lock_);
-    return ring_state_.is_master;
-}
-
-io_phase1_batch_executor_t::ring_state_t io_phase1_batch_executor_t::ring_state_snapshot() {
-    thr::spinlock_guard_t ring_state_guard(ring_state_lock_);
-    return ring_state_;
 }
 
 } // namespace phantom
