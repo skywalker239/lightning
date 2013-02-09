@@ -17,7 +17,7 @@ MODULE(io_paxos_executor);
 io_paxos_executor_t::io_paxos_executor_t(const string_t& name,
                                          const config_t& config)
     : io_t(name, config),
-      pending_pool_(config.pending_pool),
+      acceptor_store_(config.acceptor_store),
       proposer_pool_(config.proposer_pool),
       ring_sender_(config.ring_sender),
       request_id_generator_(config.request_id_generator),

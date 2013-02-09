@@ -5,8 +5,6 @@
 // vim: set tabstop=4 expandtab:
 #include "io_phase1_batch_executor.H"
 
-#include <limits>
-
 #include <pd/bq/bq_job.H>
 
 #include <phantom/module.H>
@@ -144,12 +142,12 @@ bool io_phase1_batch_executor_t::accept_one_instance(
         instance_id_t iid,
         ballot_id_t ballot_id,
         batch_fail_t* fail) {
-    acceptor_instance_store_t::err_t err;
-    ref_t<acceptor_instance_t> instance = pending_pool_->lookup(iid, &err);
+    ref_t<acceptor_instance_t> instance;
+    acceptor_store_t::err_t err = acceptor_store_->lookup(iid, &instance);
 
-    if(err == acceptor_instance_store_t::err_t::IID_TOO_LOW) {
+    if(err == acceptor_store_t::err_t::IID_TOO_LOW) {
         fail->status = IID_TOO_LOW;
-    } else if(err == acceptor_instance_store_t::err_t::IID_TOO_HIGH) {
+    } else if(err == acceptor_store_t::err_t::IID_TOO_HIGH) {
         fail->status = IID_TOO_HIGH;
     } else {
         assert(instance); // not low, not high, must be ok

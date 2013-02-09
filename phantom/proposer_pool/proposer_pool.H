@@ -48,20 +48,20 @@ public:
     void deactivate();
 
     void push_failed(instance_id_t instance_id, ballot_id_t ballot_hint);
-
     bool pop_failed(instance_id_t* instance_id, ballot_id_t* ballot_hint);
+    bool failed_empty();
 
     void push_open(instance_id_t instance_id, ballot_id_t ballot_id);
-
     bool pop_open(instance_id_t* instance_id, ballot_id_t* ballot_id);
+    bool open_empty();
 
     void push_reserved(instance_id_t instance_id,
                        ballot_id_t ballot_id,
                        value_t value);
-
     bool pop_reserved(instance_id_t* instance_id,
                       ballot_id_t* ballot_id,
                       value_t* value);
+    bool reserved_empty();
 };
 
 } // namespace phantom
