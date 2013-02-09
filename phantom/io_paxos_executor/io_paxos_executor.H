@@ -89,10 +89,9 @@ protected:
     const interval_t ring_reply_timeout_;
 
     virtual void run_proposer() = 0;
-    virtual void run_acceptor() = 0;
-
     virtual void accept_ring_cmd(const ref_t<pi_ext_t>& cmd) = 0;
 
+    void run_acceptor();
     ring_state_t ring_state_snapshot();
     bool is_master();
 };

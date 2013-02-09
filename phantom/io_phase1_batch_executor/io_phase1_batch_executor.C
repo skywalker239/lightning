@@ -225,13 +225,4 @@ void io_phase1_batch_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd
     update_and_send_to_next(ring_cmd, all_failed);
 }
 
-void io_phase1_batch_executor_t::run_acceptor() {
-    while(true) {
-        ref_t<pi_ext_t> ring_cmd;
-        received_cmd_queue_.pop(&ring_cmd);
-
-        accept_ring_cmd(ring_cmd);
-    }
-}
-
 } // namespace phantom

@@ -97,6 +97,15 @@ void io_paxos_executor_t::ring_state_changed(ring_id_t ring_id,
     ring_state_.is_master = is_master;
 }
 
+void io_paxos_executor_t::run_acceptor() {
+    while(true) {
+        ref_t<pi_ext_t> ring_cmd;
+        received_cmd_queue_.pop(&ring_cmd);
+
+        accept_ring_cmd(ring_cmd);
+    }
+}
+
 bool io_paxos_executor_t::is_master() {
     thr::spinlock_guard_t ring_state_guard(ring_state_lock_);
     return ring_state_.is_master;

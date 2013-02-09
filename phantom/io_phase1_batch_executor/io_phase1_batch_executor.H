@@ -46,7 +46,6 @@ private:
     bq_mutex_t next_batch_start_lock_;
 
     virtual void run_proposer();
-    virtual void run_acceptor();
     virtual void accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd);
 
     bool next_batch_start(instance_id_t* start);
