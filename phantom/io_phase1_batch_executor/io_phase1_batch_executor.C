@@ -145,9 +145,9 @@ bool io_phase1_batch_executor_t::accept_one_instance(
     ref_t<acceptor_instance_t> instance;
     acceptor_store_t::err_t err = acceptor_store_->lookup(iid, &instance);
 
-    if(err == acceptor_store_t::err_t::IID_TOO_LOW) {
+    if(err == acceptor_store_t::IID_TOO_LOW) {
         fail->status = IID_TOO_LOW;
-    } else if(err == acceptor_store_t::err_t::IID_TOO_HIGH) {
+    } else if(err == acceptor_store_t::IID_TOO_HIGH) {
         fail->status = IID_TOO_HIGH;
     } else {
         assert(instance); // not low, not high, must be ok

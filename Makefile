@@ -24,13 +24,17 @@ $(eval $(call MODULE,io_guid,,lightning,))
 $(eval $(call MODULE,io_ring_sender,,pi lightning,))
 $(eval $(call MODULE,ring_handler,,pi lightning,))
 
+$(eval $(call MODULE,acceptor_store,,pi lightning,))
+
 $(eval $(call MODULE,io_paxos_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase1_batch_executor,,pi lightning,))
+
 
 # test modules
 $(eval $(call MODULE,test_pd_lightning,,pi lightning,))
 $(eval $(call MODULE,test_ring,,pi lightning,))
 $(eval $(call MODULE,test_executors,,pi lightning,))
+$(eval $(call MODULE,test_paxos_structures,,pi lightning,))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude
 

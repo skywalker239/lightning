@@ -25,6 +25,8 @@ const host_id_t kInvalidHostId = ~0U;
 const int kHostIdBits = 12;
 const host_id_t kMaxHostId = (1 << kHostIdBits) - 1;
 
+// TODO(prime@): check constants
+
 ballot_id_t next_ballot_id(ballot_id_t old, host_id_t host_id);
 
 }  // namespace pd

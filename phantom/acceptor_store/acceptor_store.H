@@ -5,23 +5,60 @@
 // vim: set tabstop=4 expandtab:
 #pragma once
 
+#include <vector>
+
+#include <pd/base/config.H>
+#include <pd/bq/bq_thr.H>
 #include <pd/lightning/acceptor_instance.H>
 #include <pd/lightning/defs.H>
 
-namespace pd {
+#include <phantom/pd.H>
+#include <phantom/obj.H>
 
-class acceptor_store_t {
+#pragma GCC visibility push(default)
+namespace phantom {
+
+class acceptor_store_t : public obj_t {
 public:
-    virtual ~acceptor_store_t() {}
+    struct config_t {
+        size_t size;
 
-    enum class err_t {
+        config_t() : size(1 << 20) {}
+
+        bool check(const in_t::ptr_t& p) const;
+    };
+
+    acceptor_store_t(const string_t& name,
+                     const config_t& config);
+
+    enum err_t {
         OK,
         IID_TOO_LOW,
         IID_TOO_HIGH
     };
 
-    virtual err_t lookup(instance_id_t iid,
-                         ref_t<acceptor_instance_t>* instance) = 0;
+    err_t lookup(instance_id_t iid,
+                 ref_t<acceptor_instance_t>* instance);
+
+    void set_last_snapshot(instance_id_t last_snapshot);
+
+    size_t size() const;
+
+    virtual void init() {};
+    virtual void exec() {};
+    virtual void fini() {};
+	virtual void stat(out_t &, bool ) { /* TODO(prime@) */ };
+private:
+    std::vector<ref_t<acceptor_instance_t>> ring_buffer_;
+
+    instance_id_t begin_, last_snapshot_;
+
+    thr::spinlock_t lock_;
+
+    bool try_expand_to(instance_id_t iid);
+    void init_and_fetch(instance_id_t iid, ref_t<acceptor_instance_t>* instance);
+
 };
 
-}  // namespace pd
+}  // namespace phantom
+#pragma GCC visibility pop
