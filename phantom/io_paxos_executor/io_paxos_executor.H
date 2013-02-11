@@ -15,9 +15,10 @@
 #include <phantom/io.H>
 #include <phantom/io_ring_sender/io_ring_sender.H>
 #include <phantom/io_guid/io_guid.H>
+#include <phantom/io_acceptor_store/io_acceptor_store.H>
 #include <phantom/ring_handler/ring_handler.H>
 #include <phantom/proposer_pool/proposer_pool.H>
-#include <phantom/acceptor_store/acceptor_store.H>
+
 
 #pragma GCC visibility push(default)
 namespace phantom {
@@ -29,7 +30,7 @@ public:
 
         config::objptr_t<proposer_pool_t> proposer_pool;
         config::objptr_t<io_ring_sender_t> ring_sender;
-        config::objptr_t<acceptor_store_t> acceptor_store;
+        config::objptr_t<io_acceptor_store_t> acceptor_store;
         config::objptr_t<io_guid_t> request_id_generator;
 
         uint32_t wait_pool_size;
@@ -73,7 +74,7 @@ protected:
     ring_state_t ring_state_;
     thr::spinlock_t ring_state_lock_;
 
-    acceptor_store_t* acceptor_store_;
+    io_acceptor_store_t* acceptor_store_;
     proposer_pool_t* proposer_pool_;
     io_ring_sender_t* ring_sender_;
     io_guid_t* request_id_generator_;

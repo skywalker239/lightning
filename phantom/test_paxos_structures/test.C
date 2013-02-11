@@ -13,7 +13,7 @@
 
 #include <phantom/io.H>
 #include <phantom/module.H>
-#include <phantom/acceptor_store/acceptor_store.H>
+#include <phantom/io_acceptor_store/io_acceptor_store.H>
 
 namespace phantom {
 
@@ -22,7 +22,7 @@ MODULE(test_paxos_structures);
 class io_paxos_structures_test_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
-        config::objptr_t<acceptor_store_t> acceptor_store;
+        config::objptr_t<io_acceptor_store_t> acceptor_store;
 
         void check(const in_t::ptr_t& p) const {
             io_t::config_t::check(p);
@@ -32,11 +32,12 @@ public:
     io_paxos_structures_test_t(const string_t& name,
                                const config_t& config)
         : io_t(name, config),
-          acceptor_store_(config.acceptor_store) {}
+          store_(config.acceptor_store) {}
 
     virtual void run() {
-        log_info("Testing acceptor_store_t");
-        log_info("Finished testing acceptor_store_t");
+        log_info("Testing io_acceptor_store_t");
+        test_acceptor_store();
+        log_info("Finished testing io_acceptor_store_t");
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -45,18 +46,67 @@ public:
 
     void test_acceptor_store() {
         ref_t<acceptor_instance_t> instance;
-        size_t size = acceptor_store_->size();
+        size_t size = store_->size();
 
-        assert(acceptor_store_->lookup(0, &instance) == acceptor_store_t::OK);
-        assert(instance->instance_id() == 0);
+#define ASSERT_LOOKUP(iid, err)\
+{\
+    assert(store_->lookup((iid), &instance) == io_acceptor_store_t::err);\
+}
 
-        assert(acceptor_store_->lookup(size, &instance) == acceptor_store_t::IID_TOO_HIGH);
+#define ASSERT_LOOKUP_OK(iid)\
+{\
+    assert(store_->lookup((iid), &instance) == io_acceptor_store_t::OK);\
+    assert(instance->instance_id() == (iid));\
+}
 
-        acceptor_store_->set_last_snapshot(size);
-        assert(acceptor_store_->lookup(size, &instance) == acceptor_store_t::OK);
-        assert(instance->instance_id() == size);
+#define ASSERT_IID(a, b)\
+{\
+    assert(store_->min_not_committed_iid() == (a));\
+    assert(store_->next_to_max_touched_iid() == (b));\
+}\
 
-        assert(acceptor_store_->lookup(size, &instance) == acceptor_store_t::IID_TOO_LOW);
+        store_->set_birth(0);
+        ASSERT_IID(0, 0);
+
+        ASSERT_LOOKUP(0, BEHIND_WALL);
+        ASSERT_IID(0, 0);
+
+        store_->move_wall_to(size + 1);
+
+        ASSERT_LOOKUP_OK(0);
+        ASSERT_LOOKUP(size, UNREACHABLE);
+        ASSERT_LOOKUP(size + 1, BEHIND_WALL);
+        ASSERT_IID(0, 1);
+
+        store_->move_last_snapshot_to(size);
+        store_->move_wall_to(2 * size);
+        for(uint i = size; i < 2 * size; ++i) {
+            ASSERT_LOOKUP_OK(i);
+            ASSERT_IID(i - size + 1, i + 1);
+        }
+
+        ASSERT_LOOKUP(0, FORGOTTEN);
+        ASSERT_LOOKUP(size - 1, FORGOTTEN);
+        ASSERT_LOOKUP(2 * size, BEHIND_WALL);
+        ASSERT_IID(size, 2 * size);
+
+        store_->set_birth(1024);
+
+        ASSERT_LOOKUP(0, DEAD);
+        ASSERT_LOOKUP(1023, DEAD);
+        ASSERT_IID(1024, 1024);
+
+        store_->move_wall_to(1024 + 2 * size + 1);
+        ASSERT_LOOKUP_OK(1024);
+        ASSERT_IID(1024, 1025);
+        store_->move_last_snapshot_to(1024 + 2 * size);
+        ASSERT_LOOKUP_OK(1024 + 2 * size);
+        ASSERT_IID(1024 + size + 1, 1024 + 2 * size + 1);
+
+#undef ASSERT_LOOKUP
+#undef ASSERT_LOOKUP_OK
+#undef ASSERT_IID
+        // TODO(prime@): test nofity_commit()
     }
 
     virtual void init() {}
@@ -66,7 +116,7 @@ public:
     virtual ~io_paxos_structures_test_t() {}
 
 private:
-    acceptor_store_t* acceptor_store_;
+    io_acceptor_store_t* store_;
 };
 
 namespace io_paxos_structures_test {

@@ -61,13 +61,13 @@ bool ring_handler_proto_t::request_proc(in_t::ptr_t& in_ptr,
     }
 
     switch(ring_cmd_type(ring_cmd)) {
-      case PHASE1_BATCH:
+      case ring_cmd_type_t::PHASE1_BATCH:
         phase1_batch_handler_->handle_cmd(ring_cmd);
         break;
-      case PHASE1:
+      case ring_cmd_type_t::PHASE1:
         phase1_handler_->handle_cmd(ring_cmd);
         break;
-      case PHASE2:
+      case ring_cmd_type_t::PHASE2:
         phase2_handler_->handle_cmd(ring_cmd);
         break;
       default:

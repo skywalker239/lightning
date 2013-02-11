@@ -105,7 +105,7 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
     {
         if(fail_ptr && fail_iid(*fail_ptr) == iid) {
             switch(fail_status(*fail_ptr)) {
-            case IID_TOO_HIGH:
+            case instance_status_t::IID_TOO_HIGH:
                 log_warning("received IID_TOO_HIGH");
 
                 proposer_pool_->push_failed(
@@ -113,18 +113,19 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
                     next_ballot_id(batch_ballot_id(ring_reply), host_id_)
                 );
                 break;
-            case LOW_BALLOT_ID:
-            case RESERVED:
+            case instance_status_t::LOW_BALLOT_ID:
+            case instance_status_t::RESERVED:
                 proposer_pool_->push_failed(
                     iid,
                     next_ballot_id(fail_highest_promise(*fail_ptr), host_id_)
                 );
                 break;
-            case IID_TOO_LOW:
-                log_warning("batcher received IID_TOO_LOW");
+            case instance_status_t::IID_TOO_LOW:
+                log_error("batcher received IID_TOO_LOW, bug in ring selector");
+                assert(!"batcher received IID_TOO_LOW, bug in ring selector");
                 break;
-            case OPEN:
-                log_error("batcher received OPEN");
+            case instance_status_t::OPEN:
+                log_error("batcher received OPEN, this should never happed");
                 break;
             default:
                 log_error("batcher received unknown instance status");
@@ -143,14 +144,20 @@ bool io_phase1_batch_executor_t::accept_one_instance(
         ballot_id_t ballot_id,
         batch_fail_t* fail) {
     ref_t<acceptor_instance_t> instance;
-    acceptor_store_t::err_t err = acceptor_store_->lookup(iid, &instance);
+    io_acceptor_store_t::err_t err = acceptor_store_->lookup(iid, &instance);
 
-    if(err == acceptor_store_t::IID_TOO_LOW) {
-        fail->status = IID_TOO_LOW;
-    } else if(err == acceptor_store_t::IID_TOO_HIGH) {
-        fail->status = IID_TOO_HIGH;
+    if(err == io_acceptor_store_t::DEAD ||
+       err == io_acceptor_store_t::FORGOTTEN)
+    {
+        log_error("Instance %ld is DEAD or FORGOTTEN."
+                  "Bug in ring selector, this should never happend.", iid);
+        // master better kill himself, LOL
+        fail->status = instance_status_t::IID_TOO_LOW;
+    } else if(err == io_acceptor_store_t::BEHIND_WALL ||
+              err == io_acceptor_store_t::UNREACHABLE) {
+        fail->status = instance_status_t::IID_TOO_HIGH;
     } else {
-        assert(instance); // not low, not high, must be ok
+        assert(instance);
 
         ballot_id_t highest_voted = kInvalidBallotId;
         ballot_id_t highest_promised = kInvalidBallotId;
@@ -165,9 +172,9 @@ bool io_phase1_batch_executor_t::accept_one_instance(
             return true;
         } else {
             if(highest_voted != kInvalidBallotId) {
-                fail->status = RESERVED;
+                fail->status = instance_status_t::RESERVED;
             } else {
-                fail->status = LOW_BALLOT_ID;
+                fail->status = instance_status_t::LOW_BALLOT_ID;
             }
             fail->highest_promised = highest_promised;
         }

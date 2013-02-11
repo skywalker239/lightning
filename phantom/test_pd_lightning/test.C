@@ -255,7 +255,7 @@ private:
             }
         );
 
-        assert(ring_cmd_type(cmd) == PHASE1_BATCH);
+        assert(ring_cmd_type(cmd) == ring_cmd_type_t::PHASE1_BATCH);
 
         assert(request_id(cmd) == 52);
         assert(ring_id(cmd) == 21);
@@ -270,9 +270,9 @@ private:
 
     void test_batch_ring_cmd() {
         std::vector<batch_fail_t> failed{
-            { 1050, 9, LOW_BALLOT_ID },
-            { 1051, 10, RESERVED },
-            { 1052, 11, IID_TOO_LOW }
+            { 1050, 9, instance_status_t::LOW_BALLOT_ID },
+            { 1051, 10, instance_status_t::RESERVED },
+            { 1052, 11, instance_status_t::IID_TOO_LOW }
         };
 
         ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
@@ -289,7 +289,7 @@ private:
             }
         );
 
-        assert(ring_cmd_type(cmd) == PHASE1_BATCH);
+        assert(ring_cmd_type(cmd) == ring_cmd_type_t::PHASE1_BATCH);
 
         assert(request_id(cmd) == 52);
         assert(ring_id(cmd) == 21);
@@ -303,15 +303,15 @@ private:
 
         assert(fi[0].iid == 1050);
         assert(fi[0].highest_promised == 9);
-        assert(fi[0].status == LOW_BALLOT_ID);
+        assert(fi[0].status == instance_status_t::LOW_BALLOT_ID);
 
         assert(fi[1].iid == 1051);
         assert(fi[1].highest_promised == 10);
-        assert(fi[1].status == RESERVED);
+        assert(fi[1].status == instance_status_t::RESERVED);
 
         assert(fi[2].iid == 1052);
         assert(fi[2].highest_promised == 11);
-        assert(fi[2].status == IID_TOO_LOW);
+        assert(fi[2].status == instance_status_t::IID_TOO_LOW);
 
         assert(is_ring_cmd_valid(cmd));
     }
