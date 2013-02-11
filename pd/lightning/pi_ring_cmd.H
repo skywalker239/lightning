@@ -12,21 +12,49 @@
 
 namespace pd {
 
-// TODO(prime@): ask mamchits@ is there a better way
-enum ring_cmd_type_t {
-    PHASE1_BATCH = pi_t::_private + 1,
-    PHASE1,
-    PHASE2
+/**
+ * pi_ring_cmd.H defines functions and datatypes for pibf's creation,
+ * validation and accessing.
+ *
+ * NOTE: pibf fields *must* be accessed with functions defined in this
+ * header(ring_cmd_type(), request_id() etc...).
+ *
+ * pibf's have following structure:
+ *
+ *   ring_cmd ::= [cmd_type [request_id ring_id dst_host_id] body]
+ *
+ * where body depends on cmd_type.
+ *
+ * PHASE1_BATCH:
+ *   body ::= [start_iid end_iid ballot_id failed_instances_array]
+ *   failed_instances_array ::= [failed_instance...]
+ *   failed_instance ::= [iid highest_promise instance_status]
+ *
+ * PHASE1:
+ *   body ::= [iid instance_status highest_promise? value? value_id?]
+ *
+ * PHASE2:
+ *   body ::=
+ */
+
+// NOTE: enum send over network, do not change
+enum class ring_cmd_type_t {
+    PHASE1_BATCH = 1,
+    PHASE1 = 2,
+    PHASE2 = 3
 };
 
-enum instance_status_t {
+// NOTE: enum send over network, do not change
+enum class instance_status_t {
     // instance is open, but ballot_id is to low
-    LOW_BALLOT_ID = pi_t::_private + 1,
+    LOW_BALLOT_ID = 1,
     // instance value != NULL
-    RESERVED,
-    IID_TOO_LOW,
-    IID_TOO_HIGH,
-    OPEN
+    RESERVED = 2,
+    OPEN = 3,
+    // acceptor would never participate in this instance because it is
+    // too old(forgotten or dead)
+    IID_TOO_LOW = 4,
+    IID_TOO_HIGH = 5
 };
 
 //! Check pibf blob structure.
@@ -63,7 +91,7 @@ std::vector<batch_fail_t> merge_fails(
         const std::vector<batch_fail_t>& received);
 
 inline ring_cmd_type_t ring_cmd_type(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(0).__<ring_cmd_type_t>();
+    return static_cast<ring_cmd_type_t>(ring_cmd->pi().s_ind(0).s_int());
 }
 
 inline request_id_t request_id(const ref_t<pi_ext_t>& ring_cmd) {
@@ -103,7 +131,7 @@ inline ballot_id_t fail_highest_promise(const pi_t& fail) {
 }
 
 inline instance_status_t fail_status(const pi_t& fail) {
-    return fail.s_ind(2).__<instance_status_t>();
+    return static_cast<instance_status_t>(fail.s_ind(2).s_int());
 }
 
 } // namespace pd
