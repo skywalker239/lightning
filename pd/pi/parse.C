@@ -631,7 +631,8 @@ pi_t::root_t *pi_t::parse_app(
 	for(int i = 0; i < 32; i += 8)
 		_size |= (*(ptr++) << i);
 
-	size_t size = _size * sizeof(pi_t);
+	size_t size = _size * sizeof(pi_t); // TODO(prime@): sanitize
+                                        // input here
 	char *buf = (char *)mem.alloc(size);
 
 	try {
@@ -648,5 +649,5 @@ pi_t::root_t *pi_t::parse_app(
 		throw;
 	}
 }
-	
+
 } // namespace pd

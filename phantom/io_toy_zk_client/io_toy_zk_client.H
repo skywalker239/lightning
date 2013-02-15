@@ -8,8 +8,8 @@
 #include <phantom/io.H>
 
 #include <pd/base/config_list.H>
-#include <pd/lightning/simple_var.H>
-#include <pd/lightning/snapshot_var.H>
+#include <pd/zk_vars/simple_var.H>
+#include <pd/zk_vars/snapshot_var.H>
 
 #include <phantom/io_zconf/io_zconf.H>
 

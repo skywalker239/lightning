@@ -19,6 +19,8 @@ namespace pd {
 //  (a value cache on an acceptor or a value heap on a learner)
 class pending_pool_t : public acceptor_instance_store_t {
 public:
+    using acceptor_instance_store_t::err_t;
+
     pending_pool_t(size_t pool_size,
                    acceptor_instance_store_t& committed_store);
 
@@ -26,7 +28,7 @@ public:
     //  without overwriting an uncommitted instance, lookup will insert a
     //  new instance.
     //  If it is not possible to insert a new instance, returns NULL.
-    virtual ref_t<acceptor_instance_t> lookup(instance_id_t iid);
+    virtual ref_t<acceptor_instance_t> lookup(instance_id_t iid, err_t* err);
 
     //! Always returns false (all manipulations must be done with
     //  mutating the reference that lookup() returns).
