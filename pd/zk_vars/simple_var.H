@@ -5,7 +5,7 @@
 // vim: set tabstop=4 expandtab:
 #pragma once
 
-#include <pd/lightning/var_base.H>
+#include <pd/zk_vars/var_base.H>
 #include <pd/base/exception.H>
 #include <pd/base/log.H>
 #include <pd/base/string.H>

@@ -6,7 +6,7 @@
 #pragma once
 
 #include <pd/lightning/defs.H>
-#include <pd/lightning/var_base.H>
+#include <pd/zk_vars/var_base.H>
 #include <vector>
 
 namespace pd {

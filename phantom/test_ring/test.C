@@ -13,6 +13,7 @@
 #include <pd/bq/bq_util.H>
 #include <pd/base/thr.H>
 #include <pd/base/log.H>
+#include <pd/base/assert.H>
 #include <pd/lightning/pi_ext.H>
 #include <pd/lightning/pi_ring_cmd.H>
 
@@ -24,18 +25,7 @@
 
 namespace phantom {
 
-MODULE(io_ring_sender_and_handler_test);
-
-#ifdef ASSERT
-#error ***ASSERT macros already defined***
-#endif
-
-#define ASSERT(value) \
-do { \
-  if (!(value)) { \
-    log_error("FAIL %s in %s:%d", __func__, __FILE__, __LINE__); \
-  } \
-} while(0) \
+MODULE(test_ring);
 
 struct test_ring_handler_t : public ring_handler_t {
     struct config_t {
@@ -101,9 +91,9 @@ public:
           proto2_handler_(c.proto2_handler) {}
 
     virtual void run() {
-        test_ring_handler_ignores_cmds_with_wrong_dst();
         test_ring_sender_ring_switch();
         test_ring_sender_exit_ring();
+		test_stress();
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -111,13 +101,25 @@ public:
     }
 
     void test_stress() {
+        reset_all();
 
+        for(ring_id_t ring_id = 1; ring_id < 100; ++ring_id) {
+            uint16_t port = ring_id % 2 == 0 ? kProto1Port : kProto2Port;
+            host_id_t host = ring_id % 2 == 0 ? kProto1Host : kProto2Host;
+
+            sender_->join_ring(
+                netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
+                               port));
+
+            for(int i = 0; i < 100; ++i) {
+                sender_->send(build_cmd(ring_id, host));
+            }
+        }
     }
 
     void test_ring_sender_ring_switch() {
         reset_all();
 
-        proto1_->ring_changed(30);
         sender_->join_ring(
             netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
                            kProto1Port));
@@ -127,7 +129,6 @@ public:
         sender_->exit_ring();
         sleep();
 
-        proto2_->ring_changed(31);
         sender_->join_ring(
             netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
                            kProto2Port));
@@ -138,14 +139,12 @@ public:
         sleep();
         sender_->exit_ring();
 
-        ASSERT(proto1_handler_->size() == 1);
-        ASSERT(proto2_handler_->size() == 1);
+        assert(proto1_handler_->size() == 1);
+        assert(proto2_handler_->size() == 1);
     }
 
     void test_ring_sender_exit_ring() {
         reset_all();
-
-        proto1_->ring_changed(30);
 
         sender_->join_ring(
             netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
@@ -159,23 +158,7 @@ public:
         sender_->send(build_cmd(30, kProto1Host));
         sleep();
 
-        ASSERT(proto1_handler_->size() == 1);
-    }
-
-    void test_ring_handler_ignores_cmds_with_wrong_dst() {
-        reset_all();
-
-        proto1_->ring_changed(30);
-        sender_->join_ring(
-            netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
-                           kProto1Port));
-
-        sender_->send(build_cmd(31, kProto1Host));
-        sender_->send(build_cmd(30, kProto1Host + 1));
-        sender_->send(build_cmd(31, kProto1Host + 1));
-
-        sleep();
-        ASSERT(proto1_handler_->size() == 0);
+        assert(proto1_handler_->size() == 1);
     }
 
     ref_t<pi_ext_t> build_cmd(ring_id_t ring_id, host_id_t dst_host_id) {
@@ -186,10 +169,10 @@ public:
                 dst_host_id: dst_host_id
             },
             {
-                start_instance_id: 1024,
-                end_instance_id: 2048,
+                start_iid: 1024,
+                end_iid: 2048,
                 ballot_id: 7,
-                failed_instances: std::vector<failed_instance_t>()
+                fails: std::vector<batch_fail_t>()
             }
         );
 
@@ -198,8 +181,6 @@ public:
 
     void reset_all() {
         sender_->exit_ring();
-        proto1_->ring_changed(kInvalidRingId);
-        proto2_->ring_changed(kInvalidRingId);
 
         sleep();
 
@@ -238,7 +219,5 @@ config_binding_value(io_ring_sender_and_handler_test_t, proto2_handler);
 config_binding_parent(io_ring_sender_and_handler_test_t, io_t, 1);
 config_binding_ctor(io_t, io_ring_sender_and_handler_test_t);
 } // namespace io_ring_sender
-
-#undef ASSERT
 
 } // namespace phantom

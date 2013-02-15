@@ -5,7 +5,7 @@
 // vim: set tabstop=4 expandtab:
 #pragma once
 
-#include <pd/lightning/var_base.H>
+#include <pd/zk_vars/var_base.H>
 #include <pd/base/netaddr_ipv4.H>
 
 namespace pd {

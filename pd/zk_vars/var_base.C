@@ -3,7 +3,7 @@
 // This code may be distributed under the terms of the GNU GPL v3.
 // See ‘http://www.gnu.org/licenses/gpl.html’.
 // vim: set tabstop=4 expandtab:
-#include <pd/lightning/var_base.H>
+#include <pd/zk_vars/var_base.H>
 #include <pd/base/exception.H>
 
 namespace pd {

@@ -21,7 +21,7 @@ void io_ring_sender_t::config_t::check(const in_t::ptr_t& p) const {
 io_ring_sender_t::io_ring_sender_t(const string_t& name, const config_t& config)
     : io_t(name, config),
       cmd_queue_(config.queue_size),
-      number_of_connections_(config.number_of_connections),
+      number_of_connections_(config.n_connections),
       obuf_size_(config.obuf_size),
       net_timeout_(config.net_timeout) {}
 
@@ -69,10 +69,14 @@ void io_ring_sender_t::exit_ring() {
     cmd_queue_.deactivate();
 }
 
+void io_ring_sender_t::stat(out_t&, bool) {
+    // TODO(prime@): write stat
+}
+
 namespace io_ring_sender {
 config_binding_sname(io_ring_sender_t);
 config_binding_value(io_ring_sender_t, queue_size);
-config_binding_value(io_ring_sender_t, number_of_connections);
+config_binding_value(io_ring_sender_t, n_connections);
 config_binding_value(io_ring_sender_t, obuf_size);
 config_binding_value(io_ring_sender_t, net_timeout);
 config_binding_parent(io_ring_sender_t, io_t, 1);

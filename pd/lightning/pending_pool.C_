@@ -16,16 +16,19 @@ pending_pool_t::pending_pool_t(size_t pool_size,
       committed_store_(committed_store)
 {}
 
-ref_t<acceptor_instance_t> pending_pool_t::lookup(instance_id_t iid) {
+ref_t<acceptor_instance_t> pending_pool_t::lookup(instance_id_t iid, err_t* err) {
     thr::spinlock_guard_t guard(lock_);
 
     if(iid < begin_) {
-        return committed_store_.lookup(iid);
+        return committed_store_.lookup(iid, err);
     } else if(iid >= begin_ + pool_size_) {
         if(!try_expand(iid)) {
+            *err = err_t::IID_TOO_HIGH;
             return NULL;
         }
     }
+
+    *err = err_t::OK;
     return init_and_fetch_instance(iid);
 }
 

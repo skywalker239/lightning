@@ -16,6 +16,7 @@
 #include <pd/base/ref.H>
 #include <pd/base/time.H>
 #include <pd/base/log.H>
+#include <pd/base/assert.H>
 #include <pd/bq/bq_job.H>
 #include <pd/bq/bq_cond.H>
 #include <pd/bq/bq_util.H>
@@ -24,19 +25,7 @@
 
 namespace phantom {
 
-MODULE(io_pd_lightning_test);
-
-#ifdef ASSERT
-#error ***ASSERT macros already defined***
-#endif
-
-#define ASSERT(value) \
-do { \
-  if (!(value)) { \
-    log_error("FAIL %s in %s:%d", __func__, __FILE__, __LINE__); \
-  } \
-} while(0) \
-
+MODULE(test_pd_lightning);
 
 class io_pd_lightning_test_t : public io_t {
 public:
@@ -102,7 +91,7 @@ private:
             }
         }
 
-        ASSERT(!fail);
+        assert(!fail);
     }
 
     void test_blocking_queue_timeout() {
@@ -110,24 +99,24 @@ private:
         interval_t timeout = interval_millisecond;
 
         int value;
-        ASSERT(!queue.pop(&value, &timeout));
+        assert(!queue.pop(&value, &timeout));
 
         timeout = interval_millisecond;
-        ASSERT(queue.push(0, &timeout));
+        assert(queue.push(0, &timeout));
 
         timeout = interval_millisecond;
-        ASSERT(!queue.push(1, &timeout));
+        assert(!queue.push(1, &timeout));
 
         timeout = interval_millisecond;
-        ASSERT(queue.pop(&value, &timeout));
+        assert(queue.pop(&value, &timeout));
     }
 
     void test_blocking_queue_concurrent() {
         static const int QUEUE_SIZE = 8,
                          N_READERS = 50, N_WRITERS = 50,
                          // per one reader / writer
-                         N_WRITES = 1000, N_READS = 1000;
-        ASSERT(N_READERS * N_READS == N_WRITERS * N_WRITES);
+                         N_WRITES = 10000, N_READS = 10000;
+        assert(N_READERS * N_READS == N_WRITERS * N_WRITES);
 
         blocking_queue_t<int> queue(QUEUE_SIZE);
 
@@ -171,7 +160,7 @@ private:
                 fail = true;
             }
         }
-        ASSERT(!fail);
+        assert(!fail);
     }
 
     void test_blocking_queue_pusher(blocking_queue_t<int>* queue,
@@ -204,19 +193,19 @@ private:
     void test_blocking_queue_deactivation() {
         blocking_queue_t<int> queue(1);
 
-        ASSERT(queue.push(0));
+        assert(queue.push(0));
 
         queue.deactivate();
 
         queue.activate();
 
         int value;
-        ASSERT(queue.pop(&value));
+        assert(queue.pop(&value));
 
         queue.deactivate();
 
-        ASSERT(!queue.pop(&value));
-        ASSERT(!queue.push(1));
+        assert(!queue.pop(&value));
+        assert(!queue.push(1));
     }
 
     void test_deactivation_unblocks() {
@@ -237,7 +226,7 @@ private:
 
     void deactivation_unblocks(blocking_queue_t<int>* queue) {
         int value;
-        ASSERT(!queue->pop(&value));
+        assert(!queue->pop(&value));
         delete queue;
     }
 
@@ -246,15 +235,44 @@ private:
         log_info("Testing pi_ring_cmd.H");
 
         test_batch_ring_cmd();
+        test_batch_ring_cmd_empty_failed_instances();
 
         log_info("Finished testing pi_ring_cmd.H");
     }
 
+    void test_batch_ring_cmd_empty_failed_instances() {
+        ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
+            {
+                request_id: 52,
+                ring_id: 21,
+                dst_host_id: 12
+            },
+            {
+                start_iid: 1024,
+                end_iid: 2048,
+                ballot_id: 7,
+                fails: std::vector<batch_fail_t>()
+            }
+        );
+
+        assert(ring_cmd_type(cmd) == ring_cmd_type_t::PHASE1_BATCH);
+
+        assert(request_id(cmd) == 52);
+        assert(ring_id(cmd) == 21);
+        assert(dst_host_id(cmd) == 12);
+
+        assert(batch_start_iid(cmd) == 1024);
+        assert(batch_end_iid(cmd) == 2048);
+        assert(batch_ballot_id(cmd) == 7);
+
+        assert(batch_fails(cmd)._count() == 0);
+    }
+
     void test_batch_ring_cmd() {
-        std::vector<failed_instance_t> failed{
-            { 1050, 9, LOW_BALLOT_ID },
-            { 1051, 10, RESERVED },
-            { 1052, 11, IID_TO_LOW }
+        std::vector<batch_fail_t> failed{
+            { 1050, 9, instance_status_t::LOW_BALLOT_ID },
+            { 1051, 10, instance_status_t::RESERVED },
+            { 1052, 11, instance_status_t::IID_TOO_LOW }
         };
 
         ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
@@ -264,43 +282,40 @@ private:
                 dst_host_id: 12
             },
             {
-                start_instance_id: 1024,
-                end_instance_id: 2048,
+                start_iid: 1024,
+                end_iid: 2048,
                 ballot_id: 7,
-                failed_instances: failed
+                fails: failed
             }
         );
 
-        ASSERT(ring_cmd_type(cmd) == PHASE1_BATCH);
+        assert(ring_cmd_type(cmd) == ring_cmd_type_t::PHASE1_BATCH);
 
-        ASSERT(request_id(cmd) == 52);
-        ASSERT(ring_id(cmd) == 21);
-        ASSERT(dst_host_id(cmd) == 12);
+        assert(request_id(cmd) == 52);
+        assert(ring_id(cmd) == 21);
+        assert(dst_host_id(cmd) == 12);
 
-        ASSERT(start_instance_id(cmd) == 1024);
-        ASSERT(end_instance_id(cmd) == 2048);
-        ASSERT(ballot_id(cmd) == 7);
+        assert(batch_start_iid(cmd) == 1024);
+        assert(batch_end_iid(cmd) == 2048);
+        assert(batch_ballot_id(cmd) == 7);
 
-        std::vector<failed_instance_t> fi =
-            failed_instances_pi_to_vector(failed_instances(cmd));
+        std::vector<batch_fail_t> fi = fails_pi_to_vector(batch_fails(cmd));
 
-        ASSERT(fi[0].iid == 1050);
-        ASSERT(fi[0].highest_promise == 9);
-        ASSERT(fi[0].status == LOW_BALLOT_ID);
+        assert(fi[0].iid == 1050);
+        assert(fi[0].highest_promised == 9);
+        assert(fi[0].status == instance_status_t::LOW_BALLOT_ID);
 
-        ASSERT(fi[1].iid == 1051);
-        ASSERT(fi[1].highest_promise == 10);
-        ASSERT(fi[1].status == RESERVED);
+        assert(fi[1].iid == 1051);
+        assert(fi[1].highest_promised == 10);
+        assert(fi[1].status == instance_status_t::RESERVED);
 
-        ASSERT(fi[2].iid == 1052);
-        ASSERT(fi[2].highest_promise == 11);
-        ASSERT(fi[2].status == IID_TO_LOW);
+        assert(fi[2].iid == 1052);
+        assert(fi[2].highest_promised == 11);
+        assert(fi[2].status == instance_status_t::IID_TOO_LOW);
 
-        ASSERT(is_ring_cmd_valid(cmd));
+        assert(is_ring_cmd_valid(cmd));
     }
 };
-
-#undef ASSERT
 
 namespace io_pd_lightning_test {
 config_binding_sname(io_pd_lightning_test_t);
