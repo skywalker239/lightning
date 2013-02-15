@@ -12,6 +12,8 @@
 
 namespace phantom {
 
+using namespace pd::cmd::ring;
+
 MODULE(io_paxos_executor);
 
 io_paxos_executor_t::io_paxos_executor_t(const string_t& name,
@@ -77,7 +79,9 @@ void io_paxos_executor_t::handle_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
     }
 
     if(ring_state.is_master) {
-        ref_t<wait_pool_t::data_t> data = cmd_wait_pool_.lookup(request_id(ring_cmd));
+        ref_t<wait_pool_t::data_t> data = cmd_wait_pool_.lookup(
+            request_id(ring_cmd)
+        );
 
         if(data) {
             data->send(ring_cmd);

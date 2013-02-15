@@ -25,6 +25,7 @@ public:
     io_guid_t(const string_t& name, const config_t& config);
     ~io_guid_t() throw() {}
 
+    uint64_t get_guid();
     guid_generator_t& generator();
 private:
     guid_generator_t guid_;

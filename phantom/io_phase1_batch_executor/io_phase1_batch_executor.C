@@ -11,6 +11,9 @@
 
 namespace phantom {
 
+using namespace pd::cmd::ring;
+using namespace pd::cmd::batch;
+
 MODULE(io_phase1_batch_executor);
 
 void io_phase1_batch_executor_t::config_t::check(const in_t::ptr_t& ) const {
@@ -29,12 +32,12 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
         is_master();
         ballot = next_ballot_id(ballot, host_id_))
     {
-        request_id_t request_id = request_id_generator_->generator().get_guid();
+        request_id_t request_id = request_id_generator_->get_guid();
         ring_state_t ring_state = ring_state_snapshot();
 
         wait_pool_t::item_t wait_reply(cmd_wait_pool_, request_id);
 
-        accept_ring_cmd(build_ring_batch_cmd(
+        accept_ring_cmd(cmd::batch::build(
             {
                 request_id: request_id,
                 ring_id: ring_state.ring_id,
@@ -44,7 +47,7 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
                 start_iid: batch_start,
                 end_iid: batch_start + batch_size_,
                 ballot_id: ballot,
-                fails: std::vector<batch_fail_t>()
+                fails: std::vector<fail_t>()
             }
         ));
 
@@ -92,15 +95,16 @@ void io_phase1_batch_executor_t::run_proposer() {
         }
     }
 
+    log_info("proposer stopping");
     proposer_jobs_count_.finish();
 }
 
 void io_phase1_batch_executor_t::push_to_proposer_pool(
         const ref_t<pi_ext_t>& ring_reply) {
-    auto fail_ptr = pi_t::array_t::c_ptr_t(batch_fails(ring_reply));
+    auto fail_ptr = pi_t::array_t::c_ptr_t(fails(ring_reply));
 
-    for(instance_id_t iid = batch_start_iid(ring_reply);
-        iid < batch_end_iid(ring_reply);
+    for(instance_id_t iid = start_iid(ring_reply);
+        iid < end_iid(ring_reply);
         ++iid)
     {
         if(fail_ptr && fail_iid(*fail_ptr) == iid) {
@@ -110,7 +114,7 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
 
                 proposer_pool_->push_failed(
                     iid,
-                    next_ballot_id(batch_ballot_id(ring_reply), host_id_)
+                    next_ballot_id(ballot_id(ring_reply), host_id_)
                 );
                 break;
             case instance_status_t::LOW_BALLOT_ID:
@@ -121,11 +125,9 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
                 );
                 break;
             case instance_status_t::IID_TOO_LOW:
-                log_error("batcher received IID_TOO_LOW, bug in ring selector");
-                assert(!"batcher received IID_TOO_LOW, bug in ring selector");
-                break;
-            case instance_status_t::OPEN:
-                log_error("batcher received OPEN, this should never happed");
+                // Instance was forgotten by acceptor, this means it
+                // was commited long time ago. We are ignoring this instance.
+                log_warning("batcher received IID_TOO_LOW");
                 break;
             default:
                 log_error("batcher received unknown instance status");
@@ -134,7 +136,7 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
 
             ++fail_ptr;
         } else {
-            proposer_pool_->push_open(iid, batch_ballot_id(ring_reply));
+            proposer_pool_->push_open(iid, ballot_id(ring_reply));
         }
     }
 }
@@ -142,16 +144,15 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
 bool io_phase1_batch_executor_t::accept_one_instance(
         instance_id_t iid,
         ballot_id_t ballot_id,
-        batch_fail_t* fail) {
+        fail_t* fail) {
     ref_t<acceptor_instance_t> instance;
     io_acceptor_store_t::err_t err = acceptor_store_->lookup(iid, &instance);
 
-    if(err == io_acceptor_store_t::DEAD ||
-       err == io_acceptor_store_t::FORGOTTEN)
-    {
-        log_error("Instance %ld is DEAD or FORGOTTEN."
-                  "Bug in ring selector, this should never happend.", iid);
-        // master better kill himself, LOL
+    if(err == io_acceptor_store_t::DEAD) {
+        log_error("Was asked to participate in DEAD instance (iid = %ld)", iid);
+        assert(!"Was asked to participate in DEAD instance.");
+    } else if(err == io_acceptor_store_t::FORGOTTEN) {
+        log_warning("Was asked to participate in FORGOTTEN instance (iid = %ld).", iid);
         fail->status = instance_status_t::IID_TOO_LOW;
     } else if(err == io_acceptor_store_t::BEHIND_WALL ||
               err == io_acceptor_store_t::UNREACHABLE) {
@@ -162,13 +163,12 @@ bool io_phase1_batch_executor_t::accept_one_instance(
         ballot_id_t highest_voted = kInvalidBallotId;
         ballot_id_t highest_promised = kInvalidBallotId;
 
-        instance->next_ballot(ballot_id,
-                              &highest_promised,
-                              &highest_voted,
-                              NULL);
+        bool promise_succeeded = instance->promise(ballot_id,
+                                                   &highest_promised,
+                                                   &highest_voted,
+                                                   NULL);
 
-        if(highest_promised == ballot_id && highest_voted == kInvalidBallotId) {
-            // acceptor make promise and never voted before => success
+        if(promise_succeeded) {
             return true;
         } else {
             if(highest_voted != kInvalidBallotId) {
@@ -186,10 +186,10 @@ bool io_phase1_batch_executor_t::accept_one_instance(
 
 void io_phase1_batch_executor_t::update_and_send_to_next(
         const ref_t<pi_ext_t>& received_cmd,
-        const std::vector<batch_fail_t>& localy_failed) {
-    std::vector<batch_fail_t> all_failed = merge_fails(
+        const std::vector<fail_t>& localy_failed) {
+    std::vector<fail_t> all_failed = merge_fails(
         localy_failed,
-        fails_pi_to_vector(batch_fails(received_cmd))
+        fails_pi_to_vector(fails(received_cmd))
     );
 
     ring_state_t ring_state = ring_state_snapshot();
@@ -198,31 +198,35 @@ void io_phase1_batch_executor_t::update_and_send_to_next(
         return; // ring changed, drop packet
     }
 
-    ring_sender_->send(build_ring_batch_cmd(
+    ring_sender_->send(build(
         {
             request_id: request_id(received_cmd),
             ring_id: ring_id(received_cmd),
             dst_host_id: ring_state.next_in_ring
         },
         {
-            start_iid: batch_start_iid(received_cmd),
-            end_iid: batch_end_iid(received_cmd),
-            ballot_id: batch_ballot_id(received_cmd),
+            start_iid: start_iid(received_cmd),
+            end_iid: end_iid(received_cmd),
+            ballot_id: ballot_id(received_cmd),
             fails: all_failed
         }
     ));
 }
 
 void io_phase1_batch_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
-    std::vector<batch_fail_t> all_failed;
+    std::vector<fail_t> all_failed;
 
-    for(instance_id_t iid = batch_start_iid(ring_cmd);
-        iid < batch_end_iid(ring_cmd);
+    if(start_iid(ring_cmd) < acceptor_store_->birth()) {
+        return;
+    }
+
+    for(instance_id_t iid = start_iid(ring_cmd);
+        iid < end_iid(ring_cmd);
         ++iid)
     {
-        batch_fail_t fail;
+        fail_t fail;
 
-        if(!accept_one_instance(iid, batch_ballot_id(ring_cmd), &fail)) {
+        if(!accept_one_instance(iid, ballot_id(ring_cmd), &fail)) {
             all_failed.push_back(fail);
         }
     }

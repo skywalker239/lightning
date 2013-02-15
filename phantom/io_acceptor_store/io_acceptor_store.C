@@ -67,10 +67,10 @@ void io_acceptor_store_t::set_birth(instance_id_t birth) {
     assert(check_rep());
 }
 
-void io_acceptor_store_t::nofity_commit() {
+void io_acceptor_store_t::notify_commit() {
     thr::spinlock_guard_t guard(lock_);
 
-    while(min_not_committed_iid_ < next_to_max_touched_iid_ &&
+    while(min_not_committed_iid_ < begin_ + ring_buffer_.size() &&
           init_and_fetch(min_not_committed_iid_)->committed())
     {
         ++min_not_committed_iid_;
@@ -108,6 +108,11 @@ size_t io_acceptor_store_t::size() {
     return ring_buffer_.size();
 }
 
+instance_id_t io_acceptor_store_t::birth() {
+    thr::spinlock_guard_t guard(lock_);
+    return birth_;
+}
+
 instance_id_t io_acceptor_store_t::next_to_max_touched_iid() {
     thr::spinlock_guard_t guard(lock_);
     return next_to_max_touched_iid_;
@@ -122,7 +127,7 @@ void io_acceptor_store_t::try_expand_to(instance_id_t iid) {
     assert(iid < last_snapshot_ + ring_buffer_.size());
 
     if(iid >= begin_ + ring_buffer_.size()) {
-        // if condition implies iid >= ring_buffer_.size(), so there
+        // condition implies iid >= ring_buffer_.size(), so there
         // is no int overflow in subtracton
         begin_ = iid - ring_buffer_.size() + 1;
 
@@ -136,7 +141,7 @@ ref_t<acceptor_instance_t>& io_acceptor_store_t::init_and_fetch(instance_id_t ii
     size_t index = iid % ring_buffer_.size();
     ref_t<acceptor_instance_t>& stored_instance = ring_buffer_[index];
 
-    if(!stored_instance || stored_instance->instance_id() != iid) {
+    if(!stored_instance || stored_instance->iid() != iid) {
         stored_instance = new acceptor_instance_t(iid);
     }
 

@@ -9,7 +9,11 @@
 
 namespace pd {
 
-bool is_ring_cmd_header_valid(const ref_t<pi_ext_t>& ring_cmd) {
+namespace cmd {
+
+namespace ring {
+
+bool is_header_valid(const ref_t<pi_ext_t>& ring_cmd) {
     const pi_t& header = ring_cmd->pi().s_ind(1);
 
     if (header.type() != pi_t::_array ||
@@ -21,7 +25,60 @@ bool is_ring_cmd_header_valid(const ref_t<pi_ext_t>& ring_cmd) {
     return true;
 }
 
-bool is_ring_cmd_batch_valid(const ref_t<pi_ext_t>& ring_cmd) {
+bool is_valid(const ref_t<pi_ext_t>& ring_cmd) {
+    if(ring_cmd->pi().type() != pi_t::_array) {
+        return false;
+    }
+
+    if(!is_header_valid(ring_cmd)) {
+        return false;
+    }
+
+    switch(type(ring_cmd)) {
+      case type_t::BATCH:
+        return batch::is_body_valid(ring_cmd);
+      case type_t::PROMISE:
+        // TODO(prime@) write validation code
+        return false;
+      case type_t::VOTE:
+        // TODO(prime@) write validation code
+        return false;
+      default:
+        return false;
+    }
+}
+
+ref_t<pi_ext_t> build(type_t cmd_type,
+                      const header_t& header,
+                      pi_t::pro_t& pi_body) {
+    pi_t::pro_t header_items[3] = {
+        pi_t::pro_t::uint_t(header.request_id),
+        pi_t::pro_t::uint_t(header.ring_id),
+        pi_t::pro_t::uint_t(header.dst_host_id)
+    };
+
+    pi_t::pro_t::array_t pi_header_array = { 3, header_items };
+    pi_t::pro_t pi_header(pi_header_array);
+
+    pi_t::pro_t cmd_items[3] = {
+        pi_t::pro_t::uint_t(static_cast<uint8_t>(cmd_type)),
+        pi_header,
+        pi_body
+    };
+
+    pi_t::pro_t::array_t cmd_array = { 3, cmd_items };
+    pi_t::pro_t cmd(cmd_array);
+
+    return pi_ext_t::__build(cmd);
+}
+
+} // namespace ring
+
+namespace batch {
+
+using namespace pd::cmd::ring;
+
+bool is_body_valid(const ref_t<pi_ext_t>& ring_cmd) {
     const pi_t& batch_data = ring_cmd->pi().s_ind(2);
 
     if(batch_data.type() != pi_t::_array ||
@@ -37,33 +94,10 @@ bool is_ring_cmd_batch_valid(const ref_t<pi_ext_t>& ring_cmd) {
     return true;
 }
 
-bool is_ring_cmd_valid(const ref_t<pi_ext_t>& ring_cmd) {
-    if(ring_cmd->pi().type() != pi_t::_array) {
-        return false;
-    }
 
-    if(!is_ring_cmd_header_valid(ring_cmd)) {
-        return false;
-    }
-
-    switch(ring_cmd_type(ring_cmd)) {
-      case ring_cmd_type_t::PHASE1_BATCH:
-        return is_ring_cmd_batch_valid(ring_cmd);
-      case ring_cmd_type_t::PHASE1:
-        // TODO(prime@) write validation code
-        return false;
-      case ring_cmd_type_t::PHASE2:
-        // TODO(prime@) write validation code
-        return false;
-      default:
-        return false;
-    }
-}
-
-
-std::vector<batch_fail_t> fails_pi_to_vector(
+std::vector<fail_t> fails_pi_to_vector(
         const pi_t::array_t& fails) {
-    std::vector<batch_fail_t> instances;
+    std::vector<fail_t> instances;
     instances.reserve(fails._count());
 
     for(size_t i = 0; i < fails._count(); ++i) {
@@ -95,10 +129,9 @@ instance_status_t merge_status(instance_status_t local,
     }
 }
 
-std::vector<batch_fail_t> merge_fails(
-        const std::vector<batch_fail_t>& local,
-        const std::vector<batch_fail_t>& received) {
-    std::vector<batch_fail_t> merged;
+std::vector<fail_t> merge_fails(const std::vector<fail_t>& local,
+                                const std::vector<fail_t>& received) {
+    std::vector<fail_t> merged;
     merged.reserve(local.size() + received.size());
 
     auto local_instance = local.begin();
@@ -138,34 +171,7 @@ std::vector<batch_fail_t> merge_fails(
     return merged;
 }
 
-inline ref_t<pi_ext_t> build_ring_cmd(
-        ring_cmd_type_t cmd_type,
-        const ring_cmd_header_t& header,
-        pi_t::pro_t& pi_body) {
-    pi_t::pro_t header_items[3] = {
-        pi_t::pro_t::uint_t(header.request_id),
-        pi_t::pro_t::uint_t(header.ring_id),
-        pi_t::pro_t::uint_t(header.dst_host_id)
-    };
-
-    pi_t::pro_t::array_t pi_header_array = { 3, header_items };
-    pi_t::pro_t pi_header(pi_header_array);
-
-    pi_t::pro_t cmd_items[3] = {
-        pi_t::pro_t::uint_t(static_cast<uint8_t>(cmd_type)),
-        pi_header,
-        pi_body
-    };
-
-    pi_t::pro_t::array_t cmd_array = { 3, cmd_items };
-    pi_t::pro_t cmd(cmd_array);
-
-    return pi_ext_t::__build(cmd);
-}
-
-ref_t<pi_ext_t> build_ring_batch_cmd(
-        const ring_cmd_header_t& header,
-        const ring_batch_cmd_body_t& body) {
+ref_t<pi_ext_t> build(const ring::header_t& header, const body_t& body) {
     pi_t::pro_t fails_pros[body.fails.size()];
     pi_t::pro_t::array_t fails_arrays[body.fails.size()];
     pi_t::pro_t fails_fields[body.fails.size()][3];
@@ -200,7 +206,11 @@ ref_t<pi_ext_t> build_ring_batch_cmd(
     pi_t::pro_t::array_t pi_body_array = { 4, body_items };
     pi_t::pro_t pi_body(pi_body_array);
 
-    return build_ring_cmd(ring_cmd_type_t::PHASE1_BATCH, header, pi_body);
+    return ring::build(ring::type_t::BATCH, header, pi_body);
 }
 
-}
+} // namespace batch
+
+} // namespace cmd
+
+} // namespace pd

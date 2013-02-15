@@ -55,19 +55,19 @@ bool ring_handler_proto_t::request_proc(in_t::ptr_t& in_ptr,
         return false;
     }
 
-    if(!is_ring_cmd_valid(ring_cmd)) {
+    if(!cmd::ring::is_valid(ring_cmd)) {
         log_error("invalid ring cmd schema");
         return false;
     }
 
-    switch(ring_cmd_type(ring_cmd)) {
-      case ring_cmd_type_t::PHASE1_BATCH:
+    switch(cmd::ring::type(ring_cmd)) {
+      case cmd::ring::type_t::BATCH:
         phase1_batch_handler_->handle_cmd(ring_cmd);
         break;
-      case ring_cmd_type_t::PHASE1:
+      case cmd::ring::type_t::PROMISE:
         phase1_handler_->handle_cmd(ring_cmd);
         break;
-      case ring_cmd_type_t::PHASE2:
+      case cmd::ring::type_t::VOTE:
         phase2_handler_->handle_cmd(ring_cmd);
         break;
       default:

@@ -28,6 +28,7 @@ $(eval $(call MODULE,io_acceptor_store,,pi lightning,))
 
 $(eval $(call MODULE,io_paxos_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase1_batch_executor,,pi lightning,))
+$(eval $(call MODULE,io_phase2_executor,,pi lightning,))
 
 
 # test modules

@@ -50,12 +50,13 @@ public:
 
     err_t lookup(instance_id_t iid,
                  ref_t<acceptor_instance_t>* instance);
-    void nofity_commit();
+    void notify_commit();
 
     void set_birth(instance_id_t birth);
     void move_last_snapshot_to(instance_id_t last_snapshot);
     void move_wall_to(instance_id_t wall);
 
+    instance_id_t birth();
     instance_id_t next_to_max_touched_iid();
     instance_id_t min_not_committed_iid();
     size_t size();

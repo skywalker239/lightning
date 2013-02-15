@@ -31,6 +31,10 @@ io_guid_t::io_guid_t(const string_t& name, const config_t& config)
     : io_t(name, config), guid_(config.host_id)
 {}
 
+uint64_t io_guid_t::get_guid() {
+    return guid_.get_guid();
+}
+
 guid_generator_t& io_guid_t::generator() {
     return guid_;
 }

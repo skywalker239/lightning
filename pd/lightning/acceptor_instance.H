@@ -34,19 +34,35 @@ public:
     //
     //    * last_vote is set to the value for which the acceptor has voted
     //      in ballot highest_voted_ballot. Ignored if set to NULL.
-    void next_ballot(ballot_id_t  proposed_ballot,
-                     ballot_id_t* highest_promised_ballot,
-                     ballot_id_t* highest_voted_ballot,
-                     value_t*     last_vote);
+    bool promise(ballot_id_t ballot,
+                 ballot_id_t* highest_promised_ballot,
+                 ballot_id_t* highest_proposed_ballot,
+                 value_t* last_proposal);
 
     //! Starts Paxos Phase 2 on this instance with given (ballot, value).
-    //  Return value:
-    //    * highest_promised_ballot will be set to ballot upon success
-    //      and to some higher ballot number upon failure (if this acceptor
-    //      has already promised not to vote until some higher ballot).
-    void begin_ballot(ballot_id_t  ballot,
-                      value_t      value,
-                      ballot_id_t* highest_promised_ballot);
+    bool propose(ballot_id_t ballot, value_t value);
+
+    struct vote_t {
+        vote_t()
+            : request_id(kInvalidRequestId),
+              ring_id(kInvalidRingId),
+              ballot_id(kInvalidBallotId),
+              value_id(kInvalidValueId) {}
+
+        vote_t(request_id_t request_id,
+               ring_id_t ring_id,
+               ballot_id_t ballot_id,
+               value_id_t value_id)
+            : request_id(request_id),
+              ring_id(ring_id),
+              ballot_id(ballot_id),
+              value_id(value_id) {}
+
+        request_id_t request_id;
+        ring_id_t ring_id;
+        ballot_id_t ballot_id;
+        value_id_t value_id;
+    };
 
     //! Applies a vote for (ballot, value_id) to this instance (for Ring Paxos).
     //  Returns true on success, false on failure (no value for value_id or
@@ -58,16 +74,14 @@ public:
     //
     //  request_id is the ring request id for this vote which needs to be stored
     //  to forward this vote later.
-    bool vote(request_id_t request_id,
-              ballot_id_t ballot,
-              value_id_t value_id);
+    bool vote(vote_t vote);
 
     //! Tries to commit value with value id value_id at ballot ballot.
     //  Returns true on success, false on failure (no value for this value_id).
     bool commit(value_id_t value_id);
 
     //! Id of this instance.
-    instance_id_t instance_id() const;
+    instance_id_t iid() const;
 
     //! True iff committed.
     bool committed() const;
@@ -78,16 +92,13 @@ public:
     //! If there is a pending vote stored, clears it, sets the output parameters
     //  to those of the vote and returns true.
     //  Otherwise returns false.
-    bool pending_vote(request_id_t* request_id,
-                      ballot_id_t* ballot,
-                      value_id_t* value_id);
+    bool pending_vote(vote_t* vote);
 
-    //! Used to recover a committed instance from some other acceptor.
-    void recover(ref_t<pi_ext_t> data);
+    // //! Used to recover a committed value from some other acceptor.
+    // void recover(ref_t<pi_ext_t> value);
 
-    //! Serialize for recovery.
-    //  Returns NULL if not committed.
-    ref_t<pi_ext_t> pi_instance() const;
+    // //  Returns NULL if not committed.
+    // ref_t<pi_ext_t> pi_instance() const;
 
 private:
     acceptor_instance_t(const acceptor_instance_t&) = delete;
@@ -96,13 +107,11 @@ private:
     const instance_id_t instance_id_;
 
     ballot_id_t highest_promised_ballot_;
-    ballot_id_t highest_voted_ballot_;
-    value_t last_vote_;
+    ballot_id_t highest_proposed_ballot_;
+    value_t last_proposal_;
     bool committed_;
 
-    request_id_t pending_vote_request_id_;
-    ballot_id_t  pending_vote_ballot_;
-    value_id_t   pending_vote_value_id_;
+    vote_t pending_vote_;
 
     mutable thr::spinlock_t lock_;
 

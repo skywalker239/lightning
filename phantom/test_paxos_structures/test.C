@@ -53,10 +53,10 @@ public:
     assert(store_->lookup((iid), &instance) == io_acceptor_store_t::err);\
 }
 
-#define ASSERT_LOOKUP_OK(iid)\
+#define ASSERT_LOOKUP_OK(_iid)\
 {\
-    assert(store_->lookup((iid), &instance) == io_acceptor_store_t::OK);\
-    assert(instance->instance_id() == (iid));\
+    assert(store_->lookup((_iid), &instance) == io_acceptor_store_t::OK);\
+    assert(instance->iid() == (_iid));\
 }
 
 #define ASSERT_IID(a, b)\

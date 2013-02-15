@@ -53,9 +53,9 @@ private:
     void push_to_proposer_pool(const ref_t<pi_ext_t>& ring_reply);
     bool accept_one_instance(instance_id_t iid,
                              ballot_id_t ballot_id,
-                             batch_fail_t* fail);
+                             cmd::batch::fail_t* fail);
     void update_and_send_to_next(const ref_t<pi_ext_t>& received_cmd,
-                                 const std::vector<batch_fail_t>& fails);
+                                 const std::vector<cmd::batch::fail_t>& fails);
 
 };
 

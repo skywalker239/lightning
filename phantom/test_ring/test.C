@@ -162,7 +162,7 @@ public:
     }
 
     ref_t<pi_ext_t> build_cmd(ring_id_t ring_id, host_id_t dst_host_id) {
-        ref_t<pi_ext_t> cmd = build_ring_batch_cmd(
+        ref_t<pi_ext_t> cmd = cmd::batch::build(
             {
                 request_id: 52,
                 ring_id: ring_id,
@@ -172,7 +172,7 @@ public:
                 start_iid: 1024,
                 end_iid: 2048,
                 ballot_id: 7,
-                fails: std::vector<batch_fail_t>()
+                fails: std::vector<cmd::batch::fail_t>()
             }
         );
 

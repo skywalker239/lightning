@@ -12,6 +12,8 @@
 
 namespace pd {
 
+namespace cmd {
+
 /**
  * pi_ring_cmd.H defines functions and datatypes for pibf's creation,
  * validation and accessing.
@@ -37,101 +39,122 @@ namespace pd {
  *   body ::=
  */
 
-// NOTE: enum send over network, do not change
-enum class ring_cmd_type_t {
-    PHASE1_BATCH = 1,
-    PHASE1 = 2,
-    PHASE2 = 3
-};
+namespace ring {
+    // NOTE: enum send over network, do not change existing values
+    enum class type_t {
+        BATCH = 1,
+        PROMISE = 2,
+        VOTE = 3
+    };
 
-// NOTE: enum send over network, do not change
-enum class instance_status_t {
-    // instance is open, but ballot_id is to low
-    LOW_BALLOT_ID = 1,
-    // instance value != NULL
-    RESERVED = 2,
-    OPEN = 3,
-    // acceptor would never participate in this instance because it is
-    // too old(forgotten or dead)
-    IID_TOO_LOW = 4,
-    IID_TOO_HIGH = 5
-};
+    // NOTE: enum send over network, do not change existing values
+    enum class instance_status_t {
+        // instance is open, but ballot_id is to low
+        LOW_BALLOT_ID = 1,
+        // instance value != NULL
+        RESERVED = 2,
+        OPEN = 3,
+        // acceptor would never participate in this instance because it is
+        // too old(forgotten or dead)
+        IID_TOO_LOW = 4,
+        IID_TOO_HIGH = 5
+    };
 
-//! Check pibf blob structure.
-bool is_ring_cmd_valid(const ref_t<pi_ext_t>& ring_cmd);
+    struct header_t {
+        request_id_t request_id;
+        ring_id_t ring_id;
+        host_id_t dst_host_id;
+    };
 
-struct ring_cmd_header_t {
-    request_id_t request_id;
-    ring_id_t ring_id;
-    host_id_t dst_host_id;
-};
+    //! Check pibf blob structure.
+    bool is_valid(const ref_t<pi_ext_t>& ring_cmd);
 
-struct batch_fail_t {
-    instance_id_t iid;
-    ballot_id_t highest_promised;
-    instance_status_t status;
-};
+    inline type_t type(const ref_t<pi_ext_t>& cmd) {
+        return static_cast<type_t>(cmd->pi().s_ind(0).s_int());
+    }
 
-struct ring_batch_cmd_body_t {
-    instance_id_t start_iid;
-    instance_id_t end_iid;
-    ballot_id_t ballot_id;
-    const std::vector<batch_fail_t>& fails;
-};
+    inline request_id_t request_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(1).s_ind(0).s_int();
+    }
 
-ref_t<pi_ext_t> build_ring_batch_cmd(
-    const ring_cmd_header_t& header,
-    const ring_batch_cmd_body_t& body);
+    inline ring_id_t ring_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(1).s_ind(1).s_int();
+    }
 
-std::vector<batch_fail_t> fails_pi_to_vector(
-        const pi_t::array_t& fails);
+    inline host_id_t dst_host_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(1).s_ind(2).s_int();
+    }
+} // namespace ring
 
-std::vector<batch_fail_t> merge_fails(
-        const std::vector<batch_fail_t>& local,
-        const std::vector<batch_fail_t>& received);
+namespace batch {
+    struct fail_t {
+        instance_id_t iid;
+        ballot_id_t highest_promised;
+        ring::instance_status_t status;
+    };
 
-inline ring_cmd_type_t ring_cmd_type(const ref_t<pi_ext_t>& ring_cmd) {
-    return static_cast<ring_cmd_type_t>(ring_cmd->pi().s_ind(0).s_int());
+    struct body_t {
+        instance_id_t start_iid;
+        instance_id_t end_iid;
+        ballot_id_t ballot_id;
+        const std::vector<fail_t>& fails;
+    };
+
+    ref_t<pi_ext_t> build(const ring::header_t& header,
+                          const body_t& body);
+
+    std::vector<fail_t> fails_pi_to_vector(const pi_t::array_t& fails);
+    std::vector<fail_t> merge_fails(const std::vector<fail_t>& local,
+                                    const std::vector<fail_t>& received);
+
+    inline instance_id_t start_iid(const ref_t<pi_ext_t>& ring_cmd) {
+        return ring_cmd->pi().s_ind(2).s_ind(0).s_int();
+    }
+
+    inline instance_id_t end_iid(const ref_t<pi_ext_t>& ring_cmd) {
+        return ring_cmd->pi().s_ind(2).s_ind(1).s_int();
+    }
+
+    inline ballot_id_t ballot_id(const ref_t<pi_ext_t>& ring_cmd) {
+        return ring_cmd->pi().s_ind(2).s_ind(2).s_int();
+    }
+
+    inline const pi_t::array_t& fails(const ref_t<pi_ext_t>& ring_cmd) {
+        return ring_cmd->pi().s_ind(2).s_ind(3).__array();
+    }
+
+    inline instance_id_t fail_iid(const pi_t& fail) {
+        return fail.s_ind(0).s_int();
+    }
+
+    inline ballot_id_t fail_highest_promise(const pi_t& fail) {
+        return fail.s_ind(1).s_int();
+    }
+
+    inline ring::instance_status_t fail_status(const pi_t& fail) {
+        return static_cast<ring::instance_status_t>(fail.s_ind(2).s_int());
+    }
+
+    bool is_body_valid(const ref_t<pi_ext_t>& ring_cmd);
+} // namespace batch
+
+namespace vote {
+    struct body_t {
+        instance_id_t iid;
+        ballot_id_t ballot_id;
+        value_id_t value_id;
+    };
+
+    ref_t<pi_ext_t> build(const ring::header_t& header,
+                          const body_t& body);
+
+    instance_id_t iid(const ref_t<pi_ext_t>& cmd);
+    ballot_id_t ballot_id(const ref_t<pi_ext_t>& cmd);
+    value_id_t value_id(const ref_t<pi_ext_t>& cmd);
+
+    bool is_body_valid(const ref_t<pi_ext_t>& cmd);
 }
 
-inline request_id_t request_id(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(1).s_ind(0).s_int();
-}
-
-inline ring_id_t ring_id(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(1).s_ind(1).s_int();
-}
-
-inline host_id_t dst_host_id(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(1).s_ind(2).s_int();
-}
-
-inline instance_id_t batch_start_iid(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(2).s_ind(0).s_int();
-}
-
-inline instance_id_t batch_end_iid(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(2).s_ind(1).s_int();
-}
-
-inline ballot_id_t batch_ballot_id(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(2).s_ind(2).s_int();
-}
-
-inline const pi_t::array_t& batch_fails(const ref_t<pi_ext_t>& ring_cmd) {
-    return ring_cmd->pi().s_ind(2).s_ind(3).__array();
-}
-
-inline instance_id_t fail_iid(const pi_t& fail) {
-    return fail.s_ind(0).s_int();
-}
-
-inline ballot_id_t fail_highest_promise(const pi_t& fail) {
-    return fail.s_ind(1).s_int();
-}
-
-inline instance_status_t fail_status(const pi_t& fail) {
-    return static_cast<instance_status_t>(fail.s_ind(2).s_int());
-}
+} // namespace cmd
 
 } // namespace pd

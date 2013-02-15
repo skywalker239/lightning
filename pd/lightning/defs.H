@@ -16,6 +16,7 @@ typedef uint64_t value_id_t;
 
 const instance_id_t kInvalidInstanceId = ~0ULL;
 const ballot_id_t kInvalidBallotId = 0U;
+const request_id_t kInvalidRequestId = 0;
 const value_id_t  kInvalidValueId  = 0ULL;
 
 typedef uint32_t host_id_t;
