@@ -77,10 +77,12 @@ class generic_pool_t {
      {}
 
      size_t size() {
+        thr::spinlock_guard_t guard(lock_);
         return pool_.size();
      }
 
      bool empty() {
+        thr::spinlock_guard_t guard(lock_);
         return pool_.empty(); 
      }
 
@@ -90,18 +92,27 @@ class generic_pool_t {
         cond_.send();
      }
 
-     void pop(T* value) {
+     bool pop(T* value) {
         bq_cond_guard_t guard(cond_);
         bool wait_ok = true;
 
-        while(wait_ok && pool_.empty() && is_active()) {
+        while(wait_ok && empty() && is_active())
             wait_ok = bq_success(cond_.wait(NULL));
+
+        if (!is_active()) {
+            return false;
+        } 
+
+        if(!wait_ok) {
+            throw exception_sys_t(log::error, errno, 
+                "proposer_pool(generic_pool::pop): %m");
         }
+
         
         T result = pool_.top();
         pool_.pop();
-
         (*value) = result;
+        return true;
      }
 
      void activate() {
@@ -141,7 +152,7 @@ class io_proposer_pool_t : public io_t {
     void activate();
     void deactivate();
     void say_hi() {
-        log_info("Hi!");
+        log_info(" -- Thanks for signing up for Cats Facts!");
     }
 
     void push_failed(instance_id_t instance_id, ballot_id_t ballot_hint);
@@ -160,6 +171,8 @@ class io_proposer_pool_t : public io_t {
                       value_t* value);
 
     bool reserved_empty();
+
+    size_t size();
 
     virtual void init() {}
     virtual void run()  {}

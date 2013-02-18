@@ -1,10 +1,15 @@
 #include "io_proposer_pool.H"
 #include <phantom/module.H>
-#include <pair>
 
 namespace phantom {
 
 MODULE(io_proposer_pool);
+
+size_t  io_proposer_pool_t::size() {
+    return open_instances_.size() + 
+           reserved_instances_.size() + 
+           failed_instances_.size();
+}
 
 void io_proposer_pool_t::activate() {
     open_instances_.activate();
@@ -25,10 +30,9 @@ void io_proposer_pool_t::push_failed(instance_id_t instance_id, ballot_id_t ball
 }
     
 bool io_proposer_pool_t::pop_failed(instance_id_t* instance_id, ballot_id_t* ballot_hint) {
-    if (!failed_instances_.is_active())
+    open_blob result;
+    if (!failed_instances_.pop(&result))
         return false;
-    std::pair<instance_id_t
-    failed_instances_.pop(&result);
     (*instance_id) = result.iid;
     (*ballot_hint) = result.ballot;
     return true;
@@ -45,10 +49,9 @@ void io_proposer_pool_t::push_open(instance_id_t instance_id, ballot_id_t ballot
 }
  
 bool io_proposer_pool_t::pop_open(instance_id_t* instance_id, ballot_id_t* ballot_id) {
-    if (!open_instances_.is_active())
-        return false;
     open_blob result;
-    open_instances_.pop(&result);
+    if (!open_instances_.pop(&result))
+        return false;
     (*instance_id) = result.iid;
     (*ballot_id) = result.ballot;
     return true;
@@ -69,10 +72,9 @@ void io_proposer_pool_t::push_reserved(instance_id_t instance_id,
 bool io_proposer_pool_t::pop_reserved(instance_id_t* instance_id,
                       ballot_id_t* ballot_id,
                       value_t* value) {
-    if (!reserved_instances_.is_active())
-        return false;
     reserved_blob result;
-    reserved_instances_.pop(&result);
+    if (!reserved_instances_.pop(&result))
+        return false;
     (*instance_id) = result.iid;
     (*ballot_id)   = result.ballot;
     (*value)       = result.value;
