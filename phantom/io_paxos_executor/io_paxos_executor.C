@@ -5,6 +5,7 @@
 // vim: set tabstop=4 expandtab:
 #include "io_paxos_executor.H"
 
+#include <pd/base/config.H>
 #include <pd/bq/bq_job.H>
 #include <pd/lightning/pi_ring_cmd.H>
 
@@ -55,11 +56,11 @@ void io_paxos_executor_t::start_proposer() {
         (name)('[').print(CSTR("proposer"))(']');
 
     for(uint32_t i = 0; i < num_proposer_jobs_; ++i) {
-        bq_job_t<typeof(&io_paxos_executor_t::run_proposer)>::create(
+        bq_job_t<typeof(&io_paxos_executor_t::count_and_run_proposer)>::create(
             job_name,
             scheduler.bq_thr(),
             *this,
-            &io_paxos_executor_t::run_proposer
+            &io_paxos_executor_t::count_and_run_proposer
         );
     }
 
@@ -118,6 +119,36 @@ bool io_paxos_executor_t::is_master() {
 io_paxos_executor_t::ring_state_t io_paxos_executor_t::ring_state_snapshot() {
     thr::spinlock_guard_t ring_state_guard(ring_state_lock_);
     return ring_state_;
+}
+
+void io_paxos_executor_t::count_and_run_proposer() {
+    log_info("proposer started");
+
+    run_proposer();
+
+    proposer_jobs_count_.finish();
+    log_info("proposer finished");
+}
+
+namespace io_paxos_executor {
+config_binding_sname(io_paxos_executor_t);
+
+config_binding_value(io_paxos_executor_t, host_id);
+
+config_binding_value(io_paxos_executor_t, proposer_pool);
+config_binding_value(io_paxos_executor_t, ring_sender);
+config_binding_value(io_paxos_executor_t, acceptor_store);
+config_binding_value(io_paxos_executor_t, request_id_generator);
+
+config_binding_value(io_paxos_executor_t, wait_pool_size);
+config_binding_value(io_paxos_executor_t, cmd_queue_size);
+
+config_binding_value(io_paxos_executor_t, num_proposer_jobs);
+config_binding_value(io_paxos_executor_t, num_acceptor_jobs);
+
+config_binding_value(io_paxos_executor_t, ring_reply_timeout);
+
+config_binding_parent(io_paxos_executor_t, io_t, 1);
 }
 
 } // namespace phantom

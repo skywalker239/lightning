@@ -19,7 +19,6 @@
 #include <phantom/ring_handler/ring_handler.H>
 #include <phantom/proposer_pool/proposer_pool.H>
 
-
 #pragma GCC visibility push(default)
 namespace phantom {
 
@@ -52,6 +51,8 @@ public:
     virtual void init();
     virtual void run();
     virtual void fini();
+
+    virtual void stat(out_t&, bool) {}
 
     void start_proposer();
     void wait_proposer_stop();
@@ -92,6 +93,7 @@ protected:
     virtual void run_proposer() = 0;
     virtual void accept_ring_cmd(const ref_t<pi_ext_t>& cmd) = 0;
 
+    void count_and_run_proposer();
     void run_acceptor();
     ring_state_t ring_state_snapshot();
     bool is_master();

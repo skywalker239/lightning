@@ -62,13 +62,13 @@ bool ring_handler_proto_t::request_proc(in_t::ptr_t& in_ptr,
 
     switch(cmd::ring::type(ring_cmd)) {
       case cmd::ring::type_t::BATCH:
-        phase1_batch_handler_->handle_cmd(ring_cmd);
+        phase1_batch_handler_->handle_ring_cmd(ring_cmd);
         break;
       case cmd::ring::type_t::PROMISE:
-        phase1_handler_->handle_cmd(ring_cmd);
+        phase1_handler_->handle_ring_cmd(ring_cmd);
         break;
       case cmd::ring::type_t::VOTE:
-        phase2_handler_->handle_cmd(ring_cmd);
+        phase2_handler_->handle_ring_cmd(ring_cmd);
         break;
       default:
         log_error("unknown ring cmd type");

@@ -74,9 +74,6 @@ void io_phase2_executor_t::run_proposer() {
             proposer_pool_->push_failed(iid, next_ballot_id(ballot_id, host_id_));
         }
     }
-
-    log_info("acceptor stopping");
-    proposer_jobs_count_.finish();
 }
 
 void io_phase2_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {

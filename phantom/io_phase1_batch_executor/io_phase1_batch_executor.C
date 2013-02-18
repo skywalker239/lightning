@@ -94,9 +94,6 @@ void io_phase1_batch_executor_t::run_proposer() {
             push_to_proposer_pool(reply);
         }
     }
-
-    log_info("proposer stopping");
-    proposer_jobs_count_.finish();
 }
 
 void io_phase1_batch_executor_t::push_to_proposer_pool(
