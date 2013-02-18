@@ -1,34 +1,34 @@
 #include "io_proposer_pool.H"
 #include <phantom/module.H>
+#include <pair>
 
 namespace phantom {
 
 MODULE(io_proposer_pool);
 
 void io_proposer_pool_t::activate() {
-    active = true;
-    open_instances_.active = true;
-    reserved_instances_.active = true;
-    failed_instances_.active = true;
+    open_instances_.activate();
+    reserved_instances_.activate();
+    failed_instances_.activate();
 }
 
 void io_proposer_pool_t::deactivate() { 
-    active = false;
-    open_instances_.active = false;
-    reserved_instances_.active = false;
-    failed_instances_.active = false;
+    open_instances_.deactivate();
+    reserved_instances_.deactivate();
+    failed_instances_.deactivate();
 }
 
 void io_proposer_pool_t::push_failed(instance_id_t instance_id, ballot_id_t ballot_hint) {
-    if (!active)
+    if (!failed_instances_.is_active())
         return;
     failed_instances_.push(open_blob(instance_id, ballot_hint));
 }
     
 bool io_proposer_pool_t::pop_failed(instance_id_t* instance_id, ballot_id_t* ballot_hint) {
-    if (!active)
+    if (!failed_instances_.is_active())
         return false;
-    open_blob result = failed_instances_.pop();
+    std::pair<instance_id_t
+    failed_instances_.pop(&result);
     (*instance_id) = result.iid;
     (*ballot_hint) = result.ballot;
     return true;
@@ -39,15 +39,16 @@ bool io_proposer_pool_t::failed_empty() {
 }
 
 void io_proposer_pool_t::push_open(instance_id_t instance_id, ballot_id_t ballot_id) {
-    if (!active)
+    if (!open_instances_.is_active())
         return;
     open_instances_.push(open_blob(instance_id, ballot_id));
 }
  
 bool io_proposer_pool_t::pop_open(instance_id_t* instance_id, ballot_id_t* ballot_id) {
-    if (!active)
+    if (!open_instances_.is_active())
         return false;
-    open_blob result = open_instances_.pop();
+    open_blob result;
+    open_instances_.pop(&result);
     (*instance_id) = result.iid;
     (*ballot_id) = result.ballot;
     return true;
@@ -60,7 +61,7 @@ bool io_proposer_pool_t::open_empty() {
 void io_proposer_pool_t::push_reserved(instance_id_t instance_id,
                        ballot_id_t ballot_id,
                        value_t value) {
-    if (!active)
+    if (!reserved_instances_.is_active())
         return;
     reserved_instances_.push(reserved_blob(instance_id, ballot_id, value));
 }
@@ -68,9 +69,10 @@ void io_proposer_pool_t::push_reserved(instance_id_t instance_id,
 bool io_proposer_pool_t::pop_reserved(instance_id_t* instance_id,
                       ballot_id_t* ballot_id,
                       value_t* value) {
-    if (!active)
+    if (!reserved_instances_.is_active())
         return false;
-    reserved_blob result = reserved_instances_.pop();
+    reserved_blob result;
+    reserved_instances_.pop(&result);
     (*instance_id) = result.iid;
     (*ballot_id)   = result.ballot;
     (*value)       = result.value;
