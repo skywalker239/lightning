@@ -50,6 +50,8 @@ struct open_blob {
     instance_id_t iid;
     ballot_id_t   ballot;
     
+
+    open_blob() {}
     open_blob(instance_id_t iid, ballot_id_t ballot) : iid(iid), 
                                                        ballot(ballot)
     {}
@@ -60,6 +62,8 @@ struct open_blob {
 };
 
 struct reserved_blob : open_blob {
+    reserved_blob() : open_blob()
+    {}
     reserved_blob(instance_id_t iid, ballot_id_t ballot, value_t value) :
         open_blob(iid, ballot), value(value)
     {}
@@ -86,21 +90,41 @@ class generic_pool_t {
         cond_.send();
      }
 
-     T pop() {
+     void pop(T* value) {
         bq_cond_guard_t guard(cond_);
         bool wait_ok = true;
 
-        while(wait_ok && pool_.empty() && active) {
+        while(wait_ok && pool_.empty() && is_active()) {
             wait_ok = bq_success(cond_.wait(NULL));
         }
-
+        
         T result = pool_.top();
         pool_.pop();
-        return result;
+
+        (*value) = result;
      }
 
-     bool active;
+     void activate() {
+        thr::spinlock_guard_t guard(lock_);
+        active = true;
+        cond_.send(true);
+     }
+
+     void deactivate() {
+        thr::spinlock_guard_t guard(lock_);
+        active = false;
+        cond_.send(true);
+     }
+
+     bool is_active() {
+        thr::spinlock_guard_t guard(lock_);
+        return active;
+     }
+
  private:
+     bool active;
+     thr::spinlock_t lock_;
+
      bq_cond_t cond_;
      std::priority_queue<T, std::vector<T>, std::greater<T> > pool_;
 };
