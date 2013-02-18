@@ -14,6 +14,7 @@
 #include <phantom/io.H>
 #include <phantom/module.H>
 #include <phantom/io_acceptor_store/io_acceptor_store.H>
+#include <phantom/io_proposer_pool/io_proposer_pool.H>
 
 namespace phantom {
 
@@ -23,6 +24,7 @@ class io_paxos_structures_test_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
         config::objptr_t<io_acceptor_store_t> acceptor_store;
+        config::objptr_t<io_proposer_pool_t> proposer_pool;
 
         void check(const in_t::ptr_t& p) const {
             io_t::config_t::check(p);
@@ -32,12 +34,16 @@ public:
     io_paxos_structures_test_t(const string_t& name,
                                const config_t& config)
         : io_t(name, config),
-          store_(config.acceptor_store) {}
+          store_(config.acceptor_store),
+          proposer_(config.proposer_pool) {}
+
 
     virtual void run() {
         log_info("Testing io_acceptor_store_t");
         test_acceptor_store();
         log_info("Finished testing io_acceptor_store_t");
+        log_info("Testing io_proposer_pool_t");
+        test_proposer_pool();
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -108,6 +114,10 @@ public:
 #undef ASSERT_IID
         // TODO(prime@): test nofity_commit()
     }
+    
+    void test_proposer_pool() {
+        proposer_->say_hi();
+    }
 
     virtual void init() {}
     virtual void fini() {}
@@ -117,11 +127,13 @@ public:
 
 private:
     io_acceptor_store_t* store_;
+    io_proposer_pool_t* proposer_;
 };
 
 namespace io_paxos_structures_test {
 config_binding_sname(io_paxos_structures_test_t);
 config_binding_value(io_paxos_structures_test_t, acceptor_store);
+config_binding_value(io_paxos_structures_test_t, proposer_pool);
 config_binding_parent(io_paxos_structures_test_t, io_t, 1);
 config_binding_ctor(io_t, io_paxos_structures_test_t);
 } // namespace io_ring_sender

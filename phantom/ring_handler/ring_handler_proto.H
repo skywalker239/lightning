@@ -12,7 +12,6 @@
 
 #include <phantom/pd.H>
 #include <phantom/io_stream/proto.H>
-#include <phantom/io_phase1_batch_executor/io_phase1_batch_executor.H>
 
 #include <phantom/ring_handler/ring_handler.H>
 

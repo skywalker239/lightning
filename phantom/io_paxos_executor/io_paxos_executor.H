@@ -17,7 +17,7 @@
 #include <phantom/io_guid/io_guid.H>
 #include <phantom/io_acceptor_store/io_acceptor_store.H>
 #include <phantom/ring_handler/ring_handler.H>
-#include <phantom/proposer_pool/proposer_pool.H>
+#include <phantom/io_proposer_pool/io_proposer_pool.H>
 
 
 #pragma GCC visibility push(default)
@@ -28,7 +28,7 @@ public:
     struct config_t : public io_t::config_t {
         host_id_t host_id;
 
-        config::objptr_t<proposer_pool_t> proposer_pool;
+        config::objptr_t<io_proposer_pool_t> proposer_pool;
         config::objptr_t<io_ring_sender_t> ring_sender;
         config::objptr_t<io_acceptor_store_t> acceptor_store;
         config::objptr_t<io_guid_t> request_id_generator;
@@ -75,7 +75,7 @@ protected:
     thr::spinlock_t ring_state_lock_;
 
     io_acceptor_store_t* acceptor_store_;
-    proposer_pool_t* proposer_pool_;
+    io_proposer_pool_t* proposer_pool_;
     io_ring_sender_t* ring_sender_;
     io_guid_t* request_id_generator_;
 
