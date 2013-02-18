@@ -10,6 +10,8 @@
 #include <pd/base/log.H>
 #include <pd/base/config.H>
 #include <pd/base/assert.H>
+#include <pd/bq/bq_util.H>
+#include <pd/bq/bq_job.H>
 
 #include <phantom/io.H>
 #include <phantom/module.H>
@@ -117,8 +119,61 @@ public:
     
     void test_proposer_pool() {
         proposer_->say_hi();
+        
+
+        log_info("Testing standart push-pop");
+        instance_id_t iid = 2;
+        ballot_id_t   ballot = 5;
+
+
+        proposer_->push_open(iid, ballot);
+        assert(proposer_->pop_open(&iid, &ballot));
+
+        log_info("Testing delayed pop on empty");
+        test_delayed_pop();
+
+        assert(proposer_->size() == 0);
+        log_info("Testing proposer deactivation.");
+        test_deactivation();
+        log_info("Ok");
     }
 
+    void assert_pop_success(bool result) {
+        instance_id_t iid;
+        ballot_id_t ballot;
+        assert(result == proposer_->pop_open(&iid, &ballot));
+    }
+
+    void test_deactivation() {
+        bq_job_t<typeof(
+            &io_paxos_structures_test_t::assert_pop_success
+            )>::create(
+                STRING("deactivation_unblocks"),
+                bq_thr_get(),
+                *this,
+                &io_paxos_structures_test_t::assert_pop_success,
+                false
+        );
+        interval_t timeout = interval_second;
+        bq_sleep(&timeout);
+        proposer_->deactivate();
+    }
+
+    void test_delayed_pop() {
+        bq_job_t<typeof(
+            &io_paxos_structures_test_t::assert_pop_success
+            )>::create(
+                STRING("deactivation_unblocks"),
+                bq_thr_get(),
+                *this,
+                &io_paxos_structures_test_t::assert_pop_success,
+                true
+        );
+        interval_t timeout = interval_second;
+        bq_sleep(&timeout);
+        proposer_->push_open(2, 5);
+        bq_sleep(&timeout);
+    }
     virtual void init() {}
     virtual void fini() {}
     virtual void stat(pd::out_t& , bool) {}
