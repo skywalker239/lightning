@@ -22,6 +22,7 @@
 #include <pd/bq/bq_util.H>
 #include <pd/lightning/blocking_queue.H>
 #include <pd/lightning/pi_ring_cmd.H>
+#include <pd/lightning/acceptor_instance.H>
 
 namespace phantom {
 
@@ -48,6 +49,8 @@ public:
         test_blocking_queue();
 
         test_ring_cmd();
+
+        test_acceptor_instance();
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -318,6 +321,142 @@ private:
         assert(fi[2].status == cmd::ring::instance_status_t::IID_TOO_LOW);
 
         assert(cmd::ring::is_valid(cmd));
+    }
+
+    // ===== acceptor_instance_t =====
+    void test_acceptor_instance() {
+        log_info("Testing acceptor_instance_t");
+
+        test_keeps_promise();
+        test_pending_vote();
+        test_vote();
+        test_commit();
+        test_propose();
+
+        log_info("Finished testing acceptor_instance_t");
+    }
+
+    void test_keeps_promise() {
+        acceptor_instance_t acceptor(1);
+
+        assert(acceptor.iid() == 1);
+        assert(acceptor.promise(10, NULL, NULL, NULL));
+
+        ballot_id_t highest_promise;
+
+        highest_promise = kInvalidBallotId;
+        assert(!acceptor.promise(5, &highest_promise, NULL, NULL));
+        assert(highest_promise == 10);
+
+        highest_promise = kInvalidBallotId;
+        assert(!acceptor.promise(10, &highest_promise, NULL, NULL));
+        assert(highest_promise == 10);
+
+        assert(!acceptor.propose(5, value_t()));
+        assert(!acceptor.propose(9, value_t()));
+        assert(acceptor.propose(10, value_t()));
+    }
+
+    void test_pending_vote() {
+        acceptor_instance_t acceptor(1);
+
+        assert(!acceptor.vote(acceptor_instance_t::vote_t(12, 13, 14, 15)));
+
+        acceptor_instance_t::vote_t vote;
+
+        assert(!acceptor.pending_vote_ready(&vote));
+
+        value_t value;
+        value.set(15, STRING("foo bar"));
+
+        acceptor.propose(14, value);
+
+        assert(acceptor.pending_vote_ready(&vote));
+        assert(vote.request_id == 12);
+        assert(vote.ring_id == 13);
+        assert(vote.ballot_id == 14);
+        assert(vote.value_id = 15);
+
+        assert(!acceptor.pending_vote_ready(&vote));
+    }
+
+    void test_vote() {
+        acceptor_instance_t acceptor(1);
+
+        acceptor_instance_t::vote_t vote(12, 13, 14, 15);
+
+        assert(!acceptor.vote(vote));
+
+        value_t value;
+        value.set(15, STRING("foo bar"));
+
+        acceptor.propose(14, value);
+
+        assert(acceptor.vote(vote));
+        assert(acceptor.vote(vote));
+
+        vote = acceptor_instance_t::vote_t(1012, 1013, 1014, 15);
+        assert(acceptor.vote(vote));
+        assert(acceptor.vote(vote));
+
+        vote = acceptor_instance_t::vote_t(1012, 1013, 1014, 1025);
+        assert(!acceptor.vote(vote));
+        assert(!acceptor.vote(vote));
+    }
+
+    void test_commit() {
+        acceptor_instance_t acceptor(1);
+
+        assert(!acceptor.commit(12));
+        assert(!acceptor.committed());
+        assert(!acceptor.committed_value().valid());
+
+        acceptor.promise(16, NULL, NULL, NULL);
+
+        assert(!acceptor.commit(12));
+        assert(!acceptor.committed());
+        assert(!acceptor.committed_value().valid());
+
+        value_t value;
+        value.set(16, STRING("foo bar"));
+
+        assert(acceptor.propose(16, value));
+
+        assert(acceptor.commit(16));
+        assert(acceptor.committed());
+        assert(acceptor.committed_value().valid());
+
+        assert(acceptor.committed_value().value_id() == 16);
+        assert(string_t::cmp_eq<ident_t>(acceptor.committed_value().value(),
+                                         STRING("foo bar")));
+    }
+
+    void test_propose() {
+        acceptor_instance_t acceptor(1);
+
+        assert(acceptor.promise(1, NULL, NULL, NULL));
+
+        value_t value;
+        value.set(16, STRING("foo bar"));
+
+        assert(acceptor.propose(1, value));
+
+        ballot_id_t highest_proposed = kInvalidBallotId;
+        value_t proposed_value;
+
+        assert(acceptor.promise(2, NULL, &highest_proposed, &proposed_value));
+
+        assert(highest_proposed == 1);
+        assert(proposed_value.value_id() == 16);
+
+        acceptor.commit(16);
+
+        highest_proposed = kInvalidBallotId;
+        proposed_value = value_t();
+
+        assert(acceptor.promise(3, NULL, &highest_proposed, &proposed_value));
+        assert(highest_proposed == 1);
+        assert(proposed_value.value_id() == 16);
     }
 };
 

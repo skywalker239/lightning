@@ -21,7 +21,6 @@ bool is_header_valid(const ref_t<pi_ext_t>& ring_cmd) {
         return false;
     }
 
-    // TODO(prime@): check element types
     return true;
 }
 
@@ -41,8 +40,7 @@ bool is_valid(const ref_t<pi_ext_t>& ring_cmd) {
         // TODO(prime@) write validation code
         return false;
       case type_t::VOTE:
-        // TODO(prime@) write validation code
-        return false;
+        return vote::is_body_valid(ring_cmd);
       default:
         return false;
     }
@@ -79,24 +77,33 @@ namespace batch {
 using namespace pd::cmd::ring;
 
 bool is_body_valid(const ref_t<pi_ext_t>& ring_cmd) {
-    const pi_t& batch_data = ring_cmd->pi().s_ind(2);
+    const pi_t& body = ring_cmd->pi().s_ind(2);
 
-    if(batch_data.type() != pi_t::_array ||
-       batch_data.__array()._count() != 4) {
+    if(body.type() != pi_t::_array ||
+       body.__array()._count() != 4) {
         return false;
     }
 
-    if(batch_data.s_ind(3).type() != pi_t::_array) {
+    if(body.s_ind(3).type() != pi_t::_array) {
         return false;
     }
 
-    // TODO(prime@) check failed instances
+    auto fail = pi_t::array_t::c_ptr_t(body.s_ind(3).__array());
+    for(; fail; ++fail) {
+        if(fail->type() != pi_t::_array ||
+           fail->__array()._count() != 3 ||
+           start_iid(ring_cmd) > fail_iid(*fail) ||
+           end_iid(ring_cmd) <= fail_iid(*fail))
+        {
+            return false;
+        }
+    }
+
     return true;
 }
 
 
-std::vector<fail_t> fails_pi_to_vector(
-        const pi_t::array_t& fails) {
+std::vector<fail_t> fails_pi_to_vector(const pi_t::array_t& fails) {
     std::vector<fail_t> instances;
     instances.reserve(fails._count());
 
@@ -210,6 +217,34 @@ ref_t<pi_ext_t> build(const ring::header_t& header, const body_t& body) {
 }
 
 } // namespace batch
+
+namespace vote {
+
+ref_t<pi_ext_t> build(const ring::header_t& header, const body_t& body) {
+    pi_t::pro_t body_items[3] = {
+        pi_t::pro_t::uint_t(body.iid),
+        pi_t::pro_t::uint_t(body.ballot_id),
+        pi_t::pro_t::uint_t(body.value_id)
+    };
+
+    pi_t::pro_t::array_t body_array = { 3, body_items };
+    pi_t::pro_t pi_body(body_array);
+
+    return ring::build(ring::type_t::VOTE, header, pi_body);
+}
+
+bool is_body_valid(const ref_t<pi_ext_t>& cmd) {
+    const pi_t& body = cmd->pi().s_ind(2);
+
+    if(body.type() != pi_t::_array ||
+       body.__array()._count() != 3) {
+        return false;
+    }
+
+    return true;
+}
+
+} // namespace vote
 
 } // namespace cmd
 

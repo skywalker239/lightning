@@ -7,10 +7,12 @@
 namespace pd {
 
 ballot_id_t next_ballot_id(ballot_id_t old, host_id_t host_id) {
-    assert(host_id < 64);
-    assert(old < std::numeric_limits<ballot_id_t>::max() - 128);
+    assert(host_id <= kMaxHostId);
+    assert(old < (std::numeric_limits<ballot_id_t>::max() - (1 << (kHostIdBits + 1))));
 
-    return (old % 64) + 64 + host_id;
+    return (old % (1 << kHostIdBits)) +
+           (1 << kHostIdBits) +
+           host_id;
 }
 
 } // namespace

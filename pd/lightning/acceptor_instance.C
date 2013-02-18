@@ -97,11 +97,12 @@ value_t acceptor_instance_t::committed_value() const {
     return committed_ ? last_proposal_ : value_t();
 }
 
-bool acceptor_instance_t::pending_vote(vote_t* vote) {
+bool acceptor_instance_t::pending_vote_ready(vote_t* vote) {
     thr::spinlock_guard_t guard(lock_);
 
     if(pending_vote_.ballot_id != kInvalidBallotId &&
-       pending_vote_.ballot_id >= highest_promised_ballot_)
+       pending_vote_.ballot_id >= highest_promised_ballot_ &&
+       pending_vote_.value_id == last_proposal_.value_id())
     {
         *vote = pending_vote_;
         pending_vote_ = vote_t();

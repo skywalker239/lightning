@@ -38,9 +38,7 @@ private:
     virtual void run_proposer();
     virtual void accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd);
 
-    void propose(const ref_t<pi_ext_t>& udp_cmd);
-
-    void continue_pending_vote(const ref_t<acceptor_instance_t>& instance);
+    bool propose(const ref_t<pi_ext_t>& udp_cmd);
 
     void apply_vote_and_send_to_next(const ref_t<acceptor_instance_t>& instance,
                                      acceptor_instance_t::vote_t vote);

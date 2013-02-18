@@ -20,7 +20,10 @@ namespace udp {
     };
 
     bool is_valid(const ref_t<pi_ext_t>& cmd);
-    type_t type(const ref_t<pi_ext_t>& cmd);
+
+    inline type_t type(const ref_t<pi_ext_t>& cmd) {
+        return static_cast<type_t>(cmd->pi().s_ind(0).s_int());
+    }
 } // namespace udp
 
 namespace propose {

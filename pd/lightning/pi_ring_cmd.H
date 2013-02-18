@@ -138,6 +138,10 @@ namespace batch {
     bool is_body_valid(const ref_t<pi_ext_t>& ring_cmd);
 } // namespace batch
 
+namespace promise {
+
+} // namespace promise
+
 namespace vote {
     struct body_t {
         instance_id_t iid;
@@ -148,9 +152,17 @@ namespace vote {
     ref_t<pi_ext_t> build(const ring::header_t& header,
                           const body_t& body);
 
-    instance_id_t iid(const ref_t<pi_ext_t>& cmd);
-    ballot_id_t ballot_id(const ref_t<pi_ext_t>& cmd);
-    value_id_t value_id(const ref_t<pi_ext_t>& cmd);
+    inline instance_id_t iid(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_ind(0).s_int();
+    }
+
+    inline ballot_id_t ballot_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_ind(1).s_int();
+    }
+
+    inline value_id_t value_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_ind(2).s_int();
+    }
 
     bool is_body_valid(const ref_t<pi_ext_t>& cmd);
 }
