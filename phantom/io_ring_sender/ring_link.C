@@ -29,6 +29,10 @@ void ring_link_t::loop(ref_t<ring_link_t> /* me */) {
                       next_in_the_ring_.sa,
                       next_in_the_ring_.sa_len,
                       &connect_timeout) < 0) {
+            if(errno == ECANCELED) {
+                throw exception_sys_t(log::error, errno, "bq_connect: %m");
+            }
+
             log_warning("bq_connect: %m");
             continue;
         }
