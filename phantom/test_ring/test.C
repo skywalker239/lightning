@@ -16,6 +16,7 @@
 #include <pd/base/assert.H>
 #include <pd/lightning/pi_ext.H>
 #include <pd/lightning/pi_ring_cmd.H>
+#include <pd/lightning/finished_counter.H>
 
 #include <phantom/io.H>
 #include <phantom/module.H>
@@ -93,7 +94,8 @@ public:
     virtual void run() {
         test_ring_sender_ring_switch();
         test_ring_sender_exit_ring();
-		test_stress();
+        test_stress();
+        test_benchmark();
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -159,6 +161,51 @@ public:
         sleep();
 
         assert(proto1_handler_->size() == 1);
+    }
+
+    void test_benchmark() {
+        log_info("Starting test_benchmark()");
+
+        reset_all();
+        sender_->join_ring(
+            netaddr_ipv4_t(address_ipv4_t(2130706433 /* 127.0.0.1 */),
+                           kProto1Port));
+
+        sleep();
+
+        const int N_SENDERS = 10;
+        const int CMD_PER_SENDER = 100000;
+
+        finished_counter_t count;
+        count.started(N_SENDERS);
+
+        for(int i = 0; i < N_SENDERS; ++i) {
+            bq_job_t<typeof(&io_ring_sender_and_handler_test_t::send_many)>::create(
+                STRING("sender"),
+                scheduler.bq_thr(),
+                *this,
+                &io_ring_sender_and_handler_test_t::send_many,
+                CMD_PER_SENDER,
+                &count
+            );
+        }
+
+        count.wait_for_all_to_finish();
+
+        log_info("test_benchmark() finished");
+        log_info("%d cmds send, %lu cmds received",
+                 N_SENDERS * CMD_PER_SENDER,
+                 proto1_handler_->size());
+    }
+
+    void send_many(int cmd_count, finished_counter_t* active_senders) {
+        ref_t<pi_ext_t> cmd = build_cmd(30, kProto1Host);
+
+        for(int i = 0; i < cmd_count; ++i) {
+            sender_->send(cmd);
+        }
+
+        active_senders->finish();
     }
 
     ref_t<pi_ext_t> build_cmd(ring_id_t ring_id, host_id_t dst_host_id) {
