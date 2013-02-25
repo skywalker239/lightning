@@ -11,6 +11,31 @@ size_t  io_proposer_pool_t::size() {
            failed_instances_.size();
 }
 
+size_t io_proposer_pool_t::open_size() {
+	return open_instances_.size();
+}
+
+size_t io_proposer_pool_t::failed_size() {
+	return failed_instances_.size();
+}
+
+size_t io_proposer_pool_t::reserved_size() {
+	return reserved_instances_.size();
+}
+
+bool io_proposer_pool_t::empty() {
+	return open_instances_.empty() &&
+		 failed_instances_.empty() &&
+	   reserved_instances_.empty();
+}
+
+void io_proposer_pool_t::clear() {
+	open_instances_.clear();
+	failed_instances_.clear();
+	reserved_instances_.clear();
+	return;
+} 
+
 void io_proposer_pool_t::activate() {
     open_instances_.activate();
     reserved_instances_.activate();
@@ -24,17 +49,14 @@ void io_proposer_pool_t::deactivate() {
 }
 
 void io_proposer_pool_t::push_failed(instance_id_t instance_id, ballot_id_t ballot_hint) {
-    if (!failed_instances_.is_active())
-        return;
-    failed_instances_.push(open_blob(instance_id, ballot_hint));
+    failed_instances_.push(std::make_tuple(instance_id, ballot_hint));
 }
     
 bool io_proposer_pool_t::pop_failed(instance_id_t* instance_id, ballot_id_t* ballot_hint) {
-    open_blob result;
+    std::tuple<instance_id_t, ballot_id_t> result;
     if (!failed_instances_.pop(&result))
         return false;
-    (*instance_id) = result.iid;
-    (*ballot_hint) = result.ballot;
+	std::tie(*instance_id, *ballot_hint) = result;
     return true;
 }
     
@@ -43,17 +65,14 @@ bool io_proposer_pool_t::failed_empty() {
 }
 
 void io_proposer_pool_t::push_open(instance_id_t instance_id, ballot_id_t ballot_id) {
-    if (!open_instances_.is_active())
-        return;
-    open_instances_.push(open_blob(instance_id, ballot_id));
+    open_instances_.push(std::make_tuple(instance_id, ballot_id));
 }
  
 bool io_proposer_pool_t::pop_open(instance_id_t* instance_id, ballot_id_t* ballot_id) {
-    open_blob result;
+  std::tuple<instance_id_t, ballot_id_t> result;
     if (!open_instances_.pop(&result))
         return false;
-    (*instance_id) = result.iid;
-    (*ballot_id) = result.ballot;
+    std::tie(*instance_id, *ballot_id) = result;
     return true;
 }
 
@@ -64,20 +83,16 @@ bool io_proposer_pool_t::open_empty() {
 void io_proposer_pool_t::push_reserved(instance_id_t instance_id,
                        ballot_id_t ballot_id,
                        value_t value) {
-    if (!reserved_instances_.is_active())
-        return;
-    reserved_instances_.push(reserved_blob(instance_id, ballot_id, value));
+    reserved_instances_.push(std::make_tuple(instance_id, ballot_id, value));
 }
 
 bool io_proposer_pool_t::pop_reserved(instance_id_t* instance_id,
                       ballot_id_t* ballot_id,
                       value_t* value) {
-    reserved_blob result;
+  std::tuple<instance_id_t, ballot_id_t, value_t> result;
     if (!reserved_instances_.pop(&result))
         return false;
-    (*instance_id) = result.iid;
-    (*ballot_id)   = result.ballot;
-    (*value)       = result.value;
+	std::tie(*instance_id, *ballot_id, *value) = result;
     return true;
 }
 
