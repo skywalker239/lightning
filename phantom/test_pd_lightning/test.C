@@ -23,7 +23,6 @@
 #include <pd/lightning/blocking_queue.H>
 #include <pd/lightning/pi_ring_cmd.H>
 #include <pd/lightning/acceptor_instance.H>
-#include <pd/intrusive/list.H>
 
 namespace phantom {
 
@@ -116,10 +115,10 @@ private:
     }
 
     void test_blocking_queue_concurrent() {
-        static const int QUEUE_SIZE = 16 * 1024,
+        static const int QUEUE_SIZE = 16,
                          N_READERS = 50, N_WRITERS = 50,
                          // per one reader / writer
-                         N_WRITES = 100000, N_READS = 100000;
+                         N_WRITES = 1000, N_READS = 1000;
         assert(N_READERS * N_READS == N_WRITERS * N_WRITES);
 
         blocking_queue_t<int> queue(QUEUE_SIZE);

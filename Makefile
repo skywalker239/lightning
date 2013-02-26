@@ -9,8 +9,6 @@ $(eval $(call LIBRARY,zk_vars))
 
 include /usr/share/phantom/module.mk
 
-$(eval $(call MODULE,io_blob_sender,,pi lightning,))
-
 #$(eval $(call MODULE,io_zclient,,,))
 #$(eval $(call MODULE,io_toy_zk_client,,pi lightning,))
 #$(eval $(call MODULE,io_zhandle,,,zookeeper_mt))
@@ -18,6 +16,9 @@ $(eval $(call MODULE,io_blob_sender,,pi lightning,))
 #$(eval $(call MODULE,io_zconf,,pi lightning,))
 #$(eval $(call MODULE,io_zmaster,,lightning,))
 #$(eval $(call MODULE,io_transport_config,,pi lightning,))
+
+$(eval $(call MODULE,io_blob_sender,,pi lightning,))
+$(eval $(call MODULE,io_blob_receiver,,pi lightning,))
 
 $(eval $(call MODULE,io_guid,,lightning,))
 
@@ -33,7 +34,9 @@ $(eval $(call MODULE,io_phase2_executor,,pi lightning,))
 
 # test modules
 $(eval $(call MODULE,test_pd_lightning,,pi lightning,))
+$(eval $(call MODULE,test_pd_intrusive,,pi lightning,))
 $(eval $(call MODULE,test_ring,,pi lightning,))
+$(eval $(call MODULE,test_blob_multicast,,pi lightning,))
 $(eval $(call MODULE,test_executors,,pi lightning,))
 $(eval $(call MODULE,test_paxos_structures,,pi lightning,))
 

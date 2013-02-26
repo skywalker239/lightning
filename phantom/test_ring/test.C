@@ -174,7 +174,7 @@ public:
         sleep();
 
         const int N_SENDERS = 10;
-        const int CMD_PER_SENDER = 100000;
+        const int CMD_PER_SENDER = 1000;
 
         finished_counter_t count;
         count.started(N_SENDERS);

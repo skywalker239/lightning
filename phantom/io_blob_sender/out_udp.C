@@ -55,7 +55,7 @@ void out_udp_t::flush() {
         ++outcount;
     }
 
-    header_t header = { guid_, blob_size_, sent_bytes_, sent_parts_ };
+    header_t header = { guid_, blob_size_, sent_bytes_ };
 
     outvec[0].iov_base = &header;
     outvec[0].iov_len = sizeof(header);
@@ -86,7 +86,6 @@ void out_udp_t::flush() {
             rpos -= size;
         }
 
-        ++sent_parts_;
         sent_bytes_ += flushed_bytes;
         if(sent_bytes_ > blob_size_) {
             throw exception_log_t(log::error | log::trace, "out_udp_t overflow");

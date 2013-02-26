@@ -67,6 +67,7 @@ public:
 	virtual void stat(out_t &, bool ) { /* TODO(prime@) */ };
 private:
     std::vector<ref_t<acceptor_instance_t>> ring_buffer_;
+
     instance_id_t begin_;
 
     instance_id_t birth_, last_snapshot_, wall_;

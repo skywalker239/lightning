@@ -50,9 +50,9 @@ void io_blob_sender_t::config_t::check(const in_t::ptr_t& p) const {
     if(!max_datagram_size) {
         config::error(p, "max_datagram_size must be set");
     }
-    //! 20 is IP header, 8 is UDP header, (uint64, 3 * uint32) is chunk header.
-    if(max_datagram_size > 8950 - 20 - 8 - 3 * sizeof(uint32_t) - sizeof(uint64_t)) {
-        config::error(p, "max_datagram_size is too large (won't fit into a jumbo frame)");
+    //! 20 is IP header, 8 is UDP header
+    if(max_datagram_size > 8950 - 20 - 8 - sizeof(out_udp_t::header_t)) {
+        config::error(p, "max_datagram_size is too large");
     }
 }
 
