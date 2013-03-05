@@ -22,7 +22,9 @@ void ring_link_t::loop(ref_t<ring_link_t> /* me */) {
         }
 
         fd_guard_t fd_guard(fd);
-        bq_fd_setup(fd);
+        if(bq_fd_setup(fd) < 0) {
+            throw exception_sys_t(log::error, errno, "bq_fd_setup: %m");
+        }
 
         interval_t connect_timeout = net_timeout_;
         if(bq_connect(fd,

@@ -35,9 +35,10 @@ public:
         address_ipv4_t address;
         uint16_t port;
         config::enum_t<bool> multicast;
-        interval_t reassembly_timeout;
         config::objptr_t<handler_t> handler;
+
         size_t pending_blob_limit;
+        size_t hash_table_size;
 
         config_t();
         ~config_t() throw() {}
@@ -47,12 +48,6 @@ public:
     io_blob_receiver_t(const string_t& name, const config_t& config);
     ~io_blob_receiver_t() throw();
 private:
-    struct header_t {
-        uint64_t guid;
-        uint32_t size;
-        uint32_t begin;
-    } __attribute__((packed));
-
     virtual void init();
     virtual void fini();
     virtual void run();
@@ -62,7 +57,6 @@ private:
 
     const netaddr_ipv4_t address_;
     const bool multicast_;
-    const interval_t reassembly_timeout_;
     handler_t& handler_;
 
     blob_fragment_pool_t fragment_pool_;

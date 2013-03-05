@@ -10,6 +10,8 @@
 #include <pd/base/log.H>
 #include <pd/base/config.H>
 #include <pd/bq/bq_job.H>
+#include <pd/bq/bq_util.H>
+#include <pd/lightning/pi_ring_cmd.H>
 #include <pd/lightning/pi_ext.H>
 #include <pd/lightning/finished_counter.H>
 
@@ -23,8 +25,25 @@ namespace phantom {
 
 MODULE(test_blob_multicast);
 
-class io_blob_multicast_test_t : public io_t,
-                                 public io_blob_receiver::handler_t {
+struct test_handler_t : public io_blob_receiver::handler_t {
+    struct config_t {
+        void check(const in_t::ptr_t&) const {};
+    };
+
+    test_handler_t(string_t const &, config_t const &) {}
+
+    virtual void handle(ref_t<pi_ext_t> /*blob*/,
+                        const netaddr_t& /*remote_addr*/) {
+
+    }
+};
+
+namespace test_handler {
+config_binding_sname(test_handler_t);
+config_binding_ctor(io_blob_receiver::handler_t, test_handler_t);
+}
+
+class io_blob_multicast_test_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
         void check(const in_t::ptr_t& ) const {}
@@ -34,10 +53,13 @@ public:
 
     io_blob_multicast_test_t(const string_t& name,
                              const config_t& c)
-        : io_t(name, c) {}
+        : io_t(name, c),
+          sender_(c.sender) {}
 
     virtual void run() {
         benchmark_blob_fragment_pool();
+
+        test_simple();
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -48,14 +70,48 @@ public:
     virtual void fini() {}
     virtual void stat(pd::out_t& , bool) {}
 
-    virtual void handle(ref_t<pi_ext_t> /*blob*/,
-                        const netaddr_t& /*remote_addr*/) {
-
-    }
-
     virtual ~io_blob_multicast_test_t() {}
 
 private:
+    io_blob_sender_t* sender_;
+
+    void test_simple() {
+        ref_t<pi_ext_t> cmd = cmd::vote::build(
+            {
+                request_id: 0,
+                ring_id: 1,
+                dst_host_id: 2
+            },
+            {
+                iid: 0,
+                ballot_id: 2,
+                value_id: 3
+            }
+        );
+
+        sender_->send(0, cmd);
+
+        std::vector<cmd::batch::fail_t> fails(1000);
+
+        ref_t<pi_ext_t> huge_cmd = cmd::batch::build(
+            {
+                request_id: 52,
+                ring_id: 1,
+                dst_host_id: 3
+            },
+            {
+                start_iid: 1024,
+                end_iid: 2048,
+                ballot_id: 7,
+                fails: fails
+            }
+        );
+
+        sender_->send(1, huge_cmd);
+
+        interval_t timeout = interval_millisecond * 100;
+        bq_sleep(&timeout);
+    }
 
     void benchmark_blob_fragment_pool() {
         blob_fragment_pool_t pool(128 * 32, 128);
@@ -102,6 +158,8 @@ config_binding_sname(io_blob_multicast_test_t);
 
 config_binding_parent(io_blob_multicast_test_t, io_t, 1);
 config_binding_ctor(io_t, io_blob_multicast_test_t);
+
+config_binding_value(io_blob_multicast_test_t, sender);
 } // namespace io_ring_sender
 
 } // namespace phantom

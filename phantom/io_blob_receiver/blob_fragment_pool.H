@@ -6,6 +6,7 @@
 // vim: set tabstop=4 expandtab:
 #include <stdint.h>
 #include <memory>
+#include <vector>
 
 #include <pd/base/ref.H>
 #include <pd/base/thr.H>
@@ -26,6 +27,7 @@ public:
         blob_t(uint64_t guid, uint32_t size)
             : guid_(guid),
               size_(size),
+              received_(0),
               data_(new char[size]) {
             assert(size > 0);
         };
@@ -34,7 +36,7 @@ public:
 
         bool update(uint32_t part_begin, str_t data);
 
-        std::unique_ptr<char[]> get_data();
+        str_t get_data();
     private:
         const uint64_t guid_;
         const uint32_t size_;
@@ -43,6 +45,8 @@ public:
         std::unique_ptr<char[]> data_;
 
         thr::spinlock_t lock_;
+
+        bool completed();
 
         friend class ref_t<blob_t>;
     };

@@ -7,12 +7,16 @@
 
 #include <cstring>
 
+#include <pd/base/log.H>
+
 namespace phantom {
 
-bool blob_fragment_pool_t::blob_t::update(uint32_t part_begin, str_t data) {
+bool blob_fragment_pool_t::blob_t::update(uint32_t part_begin,
+                                          str_t data) {
     thr::spinlock_guard_t guard(lock_);
 
-    if(part_begin + data.size() > size_ ||
+    if(completed() ||
+       part_begin + data.size() > size_ ||
        data.size() + received_ > size_)
     {
         return false;
@@ -22,13 +26,19 @@ bool blob_fragment_pool_t::blob_t::update(uint32_t part_begin, str_t data) {
 
     received_ += data.size();
 
-    return received_ == size_;
+    return completed();
 }
 
-std::unique_ptr<char[]> blob_fragment_pool_t::blob_t::get_data() {
+str_t blob_fragment_pool_t::blob_t::get_data() {
     thr::spinlock_guard_t guard(lock_);
 
-    return std::move(data_);
+    assert(completed());
+
+    return str_t(data_.get(), size_);
+}
+
+bool blob_fragment_pool_t::blob_t::completed() {
+    return received_ == size_;
 }
 
 blob_fragment_pool_t::~blob_fragment_pool_t() {

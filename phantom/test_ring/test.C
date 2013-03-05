@@ -33,7 +33,7 @@ struct test_ring_handler_t : public ring_handler_t {
         void check(const in_t::ptr_t&) const {};
     };
 
-	inline test_ring_handler_t(string_t const &, config_t const &) {}
+    inline test_ring_handler_t(string_t const &, config_t const &) {}
 
     virtual void handle_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
         thr::spinlock_guard_t guard(lock_);

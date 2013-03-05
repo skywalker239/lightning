@@ -28,7 +28,9 @@ out_udp_t::out_udp_t(char* buffer,
       guid_(guid),
       bytes_sent_(bytes_sent),
       packets_sent_(packets_sent),
-      dups_(dups)
+      dups_(dups),
+      sent_bytes_(0),
+      sent_parts_(0)
 {}
 
 out_udp_t::~out_udp_t() throw() {
@@ -55,7 +57,7 @@ void out_udp_t::flush() {
         ++outcount;
     }
 
-    header_t header = { guid_, blob_size_, sent_bytes_ };
+    header_t header = { guid_, blob_size_, sent_bytes_, sent_parts_ };
 
     outvec[0].iov_base = &header;
     outvec[0].iov_len = sizeof(header);
@@ -77,20 +79,21 @@ void out_udp_t::flush() {
             throw exception_sys_t(log::error, errno, "sendmsg: %m");
         }
 
-        if(res != flushed_bytes) {
+        if(res != flushed_bytes + (uint32_t)sizeof(header_t)) {
             throw exception_log_t(log::error, "sendmsg sent %ld bytes of %d", res, flushed_bytes);
         }
 
-        rpos += res;
+        rpos += flushed_bytes;
         if(rpos > size) {
             rpos -= size;
         }
 
         sent_bytes_ += flushed_bytes;
+        sent_parts_ += 1;
         if(sent_bytes_ > blob_size_) {
-            throw exception_log_t(log::error | log::trace, "out_udp_t overflow");
+            throw exception_log_t(log::error, "out_udp_t overflow(sent=%d, blob=%d)", sent_bytes_, blob_size_);
         }
-        __sync_fetch_and_add(bytes_sent_, flushed_bytes);
+        __sync_fetch_and_add(bytes_sent_, res);
         __sync_fetch_and_add(packets_sent_, 1);
     }
 
@@ -107,15 +110,15 @@ ssize_t out_udp_t::do_sendmsg(const struct msghdr* msg) {
             __sync_fetch_and_add(dups_, 1);
             int fd2 = ::dup(fd_);
             if(fd2 < 0) {
-                throw exception_sys_t(log::error | log::trace, errno, "dup: %m");
+                throw exception_sys_t(log::error, errno, "dup: %m");
             }
             res = bq_sendmsg(fd2, msg, 0, NULL);
             if(::close(fd2) < 0) {
-                throw exception_sys_t(log::error | log::trace, errno, "close: %m");
+                throw exception_sys_t(log::error, errno, "close: %m");
             }
             return res;
         } else {
-            throw exception_sys_t(log::error | log::trace, errno, "sendmsg: %m");
+            throw exception_sys_t(log::error, errno, "sendmsg: %m");
         }
     }
     return res;

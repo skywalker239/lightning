@@ -32,6 +32,7 @@ public:
         uint64_t guid;
         uint32_t size;
         uint32_t begin;
+        uint32_t part_num;
     } __attribute__((packed));
 private:
     virtual void flush();
@@ -50,6 +51,7 @@ private:
     uint64_t* dups_;
 
     uint32_t sent_bytes_;
+    uint32_t sent_parts_;
 };
 
 }  // namespace phantom

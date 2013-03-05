@@ -137,7 +137,7 @@ void io_blob_sender_t::send(uint64_t guid,
     char buffer[max_datagram_size_];
     out_udp_t out(buffer,
                   sizeof(buffer),
-                  value->root().size * sizeof(value->root().size),
+                  value->root().size * sizeof(value->pi()),
                   fd_,
                   multicast_ ? address_ : dst,
                   guid,
