@@ -5,6 +5,8 @@
 // See ‘http://www.gnu.org/licenses/lgpl-2.1.html’.
 #pragma once
 
+#include <initializer_list>
+
 #include <pd/pi/pi.H>
 
 namespace pd {
@@ -87,12 +89,12 @@ public:
 	inline pro_t(str_t const &_str) throw() :
 		type(_string), variant(1), str(&_str) { }
 
-	inline pro_t(str_t const &&) = delete;
+//	inline pro_t(str_t const &&) = delete;
 
 	inline pro_t(array_t const &__array) throw() :
 		type(_array), variant(1), array(&__array) { }
 
-	inline pro_t(array_t const &&) = delete;
+//	inline pro_t(array_t const &&) = delete;
 
 	inline pro_t(item_t const *_items) throw() :
 		type(_array), variant(2), items(_items) { }
@@ -100,7 +102,7 @@ public:
 	inline pro_t(map_t const &__map) throw() :
 		type(_map), variant(1), map(&__map) { }
 
-	inline pro_t(map_t const &&) = delete;
+//	inline pro_t(map_t const &&) = delete;
 
 	inline pro_t(pair_t const *_pairs) throw() :
 		type(_map), variant(2), pairs(_pairs) { }
@@ -122,6 +124,9 @@ struct pi_t::pro_t::array_t {
 
 	inline array_t(count_t _count, pro_t const *_items) throw() :
 		count(_count), items(_items) { }
+
+	inline array_t(const std::initializer_list<pro_t>& _items) throw() :
+		count(_items.size()), items(_items.begin()) { }
 };
 
 struct pi_t::pro_t::item_t {
@@ -145,6 +150,9 @@ struct pi_t::pro_t::map_t {
 
 	inline map_t(count_t _count, item_t const *_items = NULL) throw() :
 		count(_count), items(_items) { }
+
+	inline map_t(const std::initializer_list<item_t>& _items) throw() :
+		count(_items.size()), items(_items.begin()) { }
 };
 
 struct pi_t::pro_t::pair_t {
@@ -160,4 +168,11 @@ struct pi_t::pro_t::pair_t {
 	inline ~pair_t() throw() { }
 };
 
-} // namaspace pd 
+namespace pi_build {
+typedef pi_t::pro_t::array_t arr_t;
+typedef pi_t::pro_t::map_t map_t;
+typedef pi_t::pro_t::uint_t uint_t;
+typedef pi_t::pro_t::int_t int_t;
+} // namespace pi_build
+
+} // namaspace pd

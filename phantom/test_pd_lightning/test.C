@@ -17,9 +17,11 @@
 #include <pd/base/time.H>
 #include <pd/base/log.H>
 #include <pd/base/assert.H>
+#include <pd/base/out_fd.H>
 #include <pd/bq/bq_job.H>
 #include <pd/bq/bq_cond.H>
 #include <pd/bq/bq_util.H>
+#include <pd/pi/pi_pro.H>
 #include <pd/lightning/blocking_queue.H>
 #include <pd/lightning/pi_ring_cmd.H>
 #include <pd/lightning/acceptor_instance.H>
@@ -51,6 +53,8 @@ public:
         test_ring_cmd();
 
         test_acceptor_instance();
+
+        test_pi_initializer_list();
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -275,9 +279,9 @@ private:
 
     void test_batch_ring_cmd() {
         std::vector<cmd::batch::fail_t> failed{
-            { 1050, 9, cmd::ring::instance_status_t::LOW_BALLOT_ID },
-            { 1051, 10, cmd::ring::instance_status_t::RESERVED },
-            { 1052, 11, cmd::ring::instance_status_t::IID_TOO_LOW }
+            { 1050, 9 },
+            { 1051, 10 },
+            { 1052, 11 }
         };
 
         ref_t<pi_ext_t> cmd = cmd::batch::build(
@@ -310,15 +314,12 @@ private:
 
         assert(fi[0].iid == 1050);
         assert(fi[0].highest_promised == 9);
-        assert(fi[0].status == cmd::ring::instance_status_t::LOW_BALLOT_ID);
 
         assert(fi[1].iid == 1051);
         assert(fi[1].highest_promised == 10);
-        assert(fi[1].status == cmd::ring::instance_status_t::RESERVED);
 
         assert(fi[2].iid == 1052);
         assert(fi[2].highest_promised == 11);
-        assert(fi[2].status == cmd::ring::instance_status_t::IID_TOO_LOW);
 
         assert(cmd::ring::is_valid(cmd));
     }
@@ -457,6 +458,41 @@ private:
         assert(acceptor.promise(3, NULL, &highest_proposed, &proposed_value));
         assert(highest_proposed == 1);
         assert(proposed_value.value_id() == 16);
+    }
+
+    void test_pi_initializer_list() {
+        using namespace pd::pi_build;
+
+        ref_t<pi_ext_t> pi(pi_ext_t::__build(
+            arr_t{
+                uint_t(10),
+                int_t(-1),
+                map_t{
+                    { int_t(10), int_t(23) },
+                    { CSTR("foo"), CSTR("bar") },
+                    {
+                        arr_t{
+                            CSTR("first"), CSTR("second"), CSTR("third")
+                        },
+                        arr_t{
+                            CSTR("one"), CSTR("two"), CSTR("three")
+                        }
+                    }
+                },
+            }
+        ));
+
+        print_pi(pi);
+    }
+
+    void print_pi(ref_t<pi_ext_t> pi) {
+        const int SIZE = 1000;
+        char buffer[SIZE];
+        out_fd_t out(buffer, SIZE, 1);
+
+        pi_t::print_text(out, &pi->root());
+
+        out.lf();
     }
 };
 
