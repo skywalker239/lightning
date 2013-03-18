@@ -345,11 +345,11 @@ private:
 
         ballot_id_t highest_promise;
 
-        highest_promise = kInvalidBallotId;
+        highest_promise = INVALID_BALLOT_ID;
         assert(!acceptor.promise(5, &highest_promise, NULL, NULL));
         assert(highest_promise == 10);
 
-        highest_promise = kInvalidBallotId;
+        highest_promise = INVALID_BALLOT_ID;
         assert(!acceptor.promise(10, &highest_promise, NULL, NULL));
         assert(highest_promise == 10);
 
@@ -442,7 +442,7 @@ private:
 
         assert(acceptor.propose(1, value));
 
-        ballot_id_t highest_proposed = kInvalidBallotId;
+        ballot_id_t highest_proposed = INVALID_BALLOT_ID;
         value_t proposed_value;
 
         assert(acceptor.promise(2, NULL, &highest_proposed, &proposed_value));
@@ -452,7 +452,7 @@ private:
 
         acceptor.commit(16);
 
-        highest_proposed = kInvalidBallotId;
+        highest_proposed = INVALID_BALLOT_ID;
         proposed_value = value_t();
 
         assert(acceptor.promise(3, NULL, &highest_proposed, &proposed_value));

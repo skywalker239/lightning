@@ -24,7 +24,7 @@ bool value_t::set(const pi_t& pi_value) {
     const value_id_t value_id = pi_value.s_ind(0).s_uint();
     const str_t& value_str = pi_value.s_ind(1).s_str();
 
-    if(value_id == kInvalidValueId || value_str.size() == 0) {
+    if(value_id == INVALID_VALUE_ID || value_str.size() == 0) {
         return false;
     }
 
@@ -42,7 +42,7 @@ bool value_t::valid() const {
 value_id_t value_t::value_id() const {
     return value_ ?
                value_->pi().s_ind(0).s_uint() :
-               kInvalidValueId;
+               INVALID_VALUE_ID;
 }
 
 const string_t value_t::value() const {

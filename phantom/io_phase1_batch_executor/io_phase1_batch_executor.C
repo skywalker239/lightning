@@ -57,7 +57,7 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
             return reply; // received reply from ring
         }
 
-        if(ballot >= 1024 * kMaxHostId) {
+        if(ballot >= 1024 * MAX_HOST_ID) {
             log_warning("ballot for batch [%ld, %ld) grow to %d",
                         batch_start,
                         batch_start + batch_size_,
@@ -137,7 +137,7 @@ bool io_phase1_batch_executor_t::accept_one_instance(
     } else {
         assert(instance);
 
-        ballot_id_t highest_promised = kInvalidBallotId;
+        ballot_id_t highest_promised = INVALID_BALLOT_ID;
 
         bool promise_succeeded = instance->promise(ballot_id,
                                                    &highest_promised,

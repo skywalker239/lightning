@@ -32,12 +32,12 @@ public:
 
     //! Returns the host id of the next host in the ring after
     //  host_id.
-    //  If host_id is not in ring, returns kInvalidHostId.
+    //  If host_id is not in ring, returns INVALID_HOST_ID.
     host_id_t next_host_id(host_id_t host_id) const;
 
     //! Returns the host id of the previous host in the ring before
     //  host_id.
-    //  If host_id is not in ring, returns kInvalidHostId.
+    //  If host_id is not in ring, returns INVALID_HOST_ID.
     host_id_t prev_host_id(host_id_t host_id) const;
 
     //! Sets the ring variable in Zookeeper.

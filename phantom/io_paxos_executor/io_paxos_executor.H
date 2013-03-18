@@ -63,8 +63,8 @@ public:
 protected:
     struct ring_state_t {
         ring_state_t()
-            : ring_id(kInvalidRingId),
-              next_in_ring(kInvalidHostId),
+            : ring_id(INVALID_RING_ID),
+              next_in_ring(INVALID_HOST_ID),
               is_master(false) {}
 
         ring_id_t ring_id;

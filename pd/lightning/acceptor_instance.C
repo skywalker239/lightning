@@ -12,7 +12,7 @@ namespace pd {
 acceptor_instance_t::acceptor_instance_t(instance_id_t instance_id)
     : instance_id_(instance_id),
       highest_promised_ballot_(0),
-      highest_proposed_ballot_(kInvalidBallotId),
+      highest_proposed_ballot_(INVALID_BALLOT_ID),
       last_proposal_(),
       committed_(false),
       pending_vote_()
@@ -39,7 +39,7 @@ bool acceptor_instance_t::promise(ballot_id_t ballot,
         *highest_proposed_ballot = highest_proposed_ballot_;
     }
 
-    if(highest_proposed_ballot_ != kInvalidBallotId && last_proposal) {
+    if(highest_proposed_ballot_ != INVALID_BALLOT_ID && last_proposal) {
         *last_proposal = last_proposal_;
     }
 
@@ -100,7 +100,7 @@ value_t acceptor_instance_t::committed_value() const {
 bool acceptor_instance_t::pending_vote_ready(vote_t* vote) {
     thr::spinlock_guard_t guard(lock_);
 
-    if(pending_vote_.ballot_id != kInvalidBallotId &&
+    if(pending_vote_.ballot_id != INVALID_BALLOT_ID &&
        pending_vote_.ballot_id >= highest_promised_ballot_ &&
        pending_vote_.value_id == last_proposal_.value_id())
     {

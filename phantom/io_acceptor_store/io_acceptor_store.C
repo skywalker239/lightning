@@ -26,7 +26,7 @@ io_acceptor_store_t::io_acceptor_store_t(const string_t& name,
     : io_t(name, config),
       ring_buffer_(config.size),
       begin_(0),
-      birth_(kInvalidInstanceId),
+      birth_(INVALID_INSTANCE_ID),
       last_snapshot_(0),
       wall_(0),
       min_not_committed_iid_(0),
@@ -80,7 +80,7 @@ void io_acceptor_store_t::notify_commit() {
 }
 
 bool io_acceptor_store_t::check_rep() {
-    return (birth_ != kInvalidInstanceId) &&
+    return (birth_ != INVALID_INSTANCE_ID) &&
            (birth_ <= begin_) &&
            (begin_ <= last_snapshot_) &&
            (next_to_max_touched_iid_ <= wall_) &&

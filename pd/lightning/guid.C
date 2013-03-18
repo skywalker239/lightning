@@ -14,7 +14,7 @@ namespace pd {
 guid_generator_t::guid_generator_t(host_id_t host_id) throw()
     : last_musec_(0), host_id_(host_id)
 {
-    assert(host_id_ <= kMaxHostId);
+    assert(host_id_ <= MAX_HOST_ID);
 }
 
 uint64_t guid_generator_t::get_guid()
@@ -30,7 +30,7 @@ uint64_t guid_generator_t::get_guid()
         }
     }
 
-    return (musec << kHostIdBits) + host_id_;
+    return (musec << HOST_ID_BITS) + host_id_;
 }
 
 }

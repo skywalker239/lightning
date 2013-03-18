@@ -40,10 +40,10 @@ public:
 
     struct vote_t {
         vote_t()
-            : request_id(kInvalidRequestId),
-              ring_id(kInvalidRingId),
-              ballot_id(kInvalidBallotId),
-              value_id(kInvalidValueId) {}
+            : request_id(INVALID_REQUEST_ID),
+              ring_id(INVALID_RING_ID),
+              ballot_id(INVALID_BALLOT_ID),
+              value_id(INVALID_VALUE_ID) {}
 
         vote_t(request_id_t request_id,
                ring_id_t ring_id,
