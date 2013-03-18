@@ -4,26 +4,23 @@
 // See ‘http://www.gnu.org/licenses/gpl.html’.
 // vim: set tabstop=4 expandtab:
 #pragma once
+#include <tuple>
 
 #include <pd/lightning/defs.H>
 #include <pd/lightning/value.H>
+#include <pd/lightning/concurrent_heap.H>
 
 #include <phantom/pd.H>
 #include <phantom/io.H>
 #include <pd/bq/bq_cond.H>
-
-#include <queue>
-#include <vector>
-#include <functional> 
 
 #pragma GCC visibility push(default)
 
 namespace phantom {
 
 /**
- * Maintains pool of active paxos instance ids along with some
- * additional information. Also responsible for throttling paxos
- * executors on proposer.
+ * Maintains a container of paxos instance pools along with some
+ * additional information.
  *
  * Consists of 3 pools.
  *
@@ -43,125 +40,28 @@ namespace phantom {
  *
  * 1) push_*() on inactive pool return immediately doing nothing.
  * 2) pop_*() on inactive pool return immediately false leaving
- *    other arguments undefined.
+ *    other arguments unmodified.
+ *
+ * Implements standart size, empty and clear container functions for
+ * whole pool and separate heaps.
  */
-
-struct open_blob {
-    instance_id_t iid;
-    ballot_id_t   ballot;
-    
-
-    open_blob() {}
-    open_blob(instance_id_t iid, ballot_id_t ballot) : iid(iid), 
-                                                       ballot(ballot)
-    {}
-
-    virtual bool operator > (const open_blob& other) const {
-        return iid > other.iid;    
-    }
-};
-
-struct reserved_blob : open_blob {
-    reserved_blob() : open_blob()
-    {}
-    reserved_blob(instance_id_t iid, ballot_id_t ballot, value_t value) :
-        open_blob(iid, ballot), value(value)
-    {}
-    value_t value;
-};
-
-template <typename T>
-class generic_pool_t {
- public:
-     generic_pool_t () : active(true) 
-     {}
-
-     size_t size() {
-        thr::spinlock_guard_t guard(lock_);
-        return pool_.size();
-     }
-
-     bool empty() {
-        thr::spinlock_guard_t guard(lock_);
-        return pool_.empty(); 
-     }
-
-     void push(T value) {
-        bq_cond_guard_t guard(cond_);
-        pool_.push(value);
-        cond_.send();
-     }
-
-     bool pop(T* value) {
-        bq_cond_guard_t guard(cond_);
-        bool wait_ok = true;
-
-        while(wait_ok && empty() && is_active())
-            wait_ok = bq_success(cond_.wait(NULL));
-
-        if (!is_active()) {
-            return false;
-        } 
-
-        if(!wait_ok) {
-            throw exception_sys_t(log::error, errno, 
-                "proposer_pool(generic_pool::pop): %m");
-        }
-
-        
-        T result = pool_.top();
-        pool_.pop();
-        (*value) = result;
-        return true;
-     }
-
-     void activate() {
-        thr::spinlock_guard_t guard(lock_);
-        active = true;
-        cond_.send(true);
-     }
-
-     void deactivate() {
-        thr::spinlock_guard_t guard(lock_);
-        active = false;
-        cond_.send(true);
-     }
-
-     bool is_active() {
-        thr::spinlock_guard_t guard(lock_);
-        return active;
-     }
-
- private:
-     bool active;
-     thr::spinlock_t lock_;
-
-     bq_cond_t cond_;
-     std::priority_queue<T, std::vector<T>, std::greater<T> > pool_;
-};
-
 class io_proposer_pool_t : public io_t {
  public:
     io_proposer_pool_t (const string_t& name, const config_t& conf) : io_t(name, conf)
     {}
 
     struct config_t : io_t::config_t {
-        config_t() {}        
+        config_t() {}
     };
 
     void activate();
     void deactivate();
-    void say_hi() {
-        log_info(" -- Thanks for signing up for Cats Facts!");
-    }
 
     void push_failed(instance_id_t instance_id, ballot_id_t ballot_hint);
     bool pop_failed(instance_id_t* instance_id, ballot_id_t* ballot_hint);
-    bool failed_empty();
 
     void push_open(instance_id_t instance_id, ballot_id_t ballot_id);
     bool pop_open(instance_id_t* instance_id, ballot_id_t* ballot_id);
-    bool open_empty();
 
     void push_reserved(instance_id_t instance_id,
                        ballot_id_t ballot_id,
@@ -170,22 +70,35 @@ class io_proposer_pool_t : public io_t {
                       ballot_id_t* ballot_id,
                       value_t* value);
 
+    size_t size();
+    size_t open_size();
+    size_t failed_size();
+    size_t reserved_size();
+
+    bool empty();
+    bool open_empty();
+    bool failed_empty();
     bool reserved_empty();
 
-    size_t size();
+    void clear();
 
     virtual void init() {}
     virtual void run()  {}
     virtual void fini() {}
     virtual void stat(out_t&, bool) {}
  private:
+    struct iid_cmp_t {
+        template <typename T>
+        bool operator() (const T& left, const T& right) const {
+            return std::get<0>(left) < std::get<0>(right);
+        }
+    };
 
-    generic_pool_t<open_blob> open_instances_;
-    generic_pool_t<open_blob> failed_instances_;
-    generic_pool_t<reserved_blob> reserved_instances_;
+    concurrent_heap_t<std::tuple<instance_id_t, ballot_id_t>, iid_cmp_t> open_instances_;
+    concurrent_heap_t<std::tuple<instance_id_t, ballot_id_t>, iid_cmp_t> failed_instances_;
+    concurrent_heap_t<std::tuple<instance_id_t, ballot_id_t, value_t>, iid_cmp_t> reserved_instances_;
 
     bool active;
-    static const int MAX_INSTANCESS_IN_PROCESSING_ = 10000;
 };
 
 } // namespace phantom
