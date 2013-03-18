@@ -194,6 +194,16 @@ ref_t<pi_ext_t> build(const ring::header_t& header, const body_t& body) {
 
 } // namespace batch
 
+namespace promise {
+
+ref_t<pi_ext_t> build(const ring::header_t& ,
+                      const body_t& ) {
+    // TODO(prime@):
+    return NULL;
+}
+
+} // namespace propose
+
 namespace vote {
 
 ref_t<pi_ext_t> build(const ring::header_t& header, const body_t& body) {

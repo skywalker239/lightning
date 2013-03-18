@@ -15,7 +15,7 @@ namespace pd {
 //  - snapshot location (currently just a string, maybe a URL...)
 class snapshot_var_t : public var_base_t {
 public:
-    snapshot_var_t(const string_t& key, phantom::io_zconf_t* io_zconf);
+    snapshot_var_t(const string_t& key, var_store_t& store);
 
     //! False iff failed to parse the information from Zookeeper.
     bool valid() const;

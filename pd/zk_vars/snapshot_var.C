@@ -9,8 +9,8 @@
 
 namespace pd {
 
-snapshot_var_t::snapshot_var_t(const string_t& key, phantom::io_zconf_t* io_zconf)
-    : var_base_t(key, io_zconf),
+snapshot_var_t::snapshot_var_t(const string_t& key, var_store_t& store)
+    : var_base_t(key, store),
       snapshot_version_(0),
       location_(string_t::empty),
       valid_(false)

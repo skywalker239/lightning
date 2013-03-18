@@ -74,8 +74,9 @@ bool io_phase1_batch_executor_t::next_batch_start(instance_id_t* start) {
     *start = next_batch_start_;
     next_batch_start_ += batch_size_;
 
+    // TODO(prime@): come up with logic for batcher throttling
     // calling under lock, so batch intervals are strongly increasing
-//    return proposer_pool_->may_start_batch(*start, next_batch_start_);
+    // return proposer_pool_->may_start_batch(*start, next_batch_start_);
     return true;
 }
 
