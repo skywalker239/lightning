@@ -6,14 +6,20 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <unistd.h>
+#include <string>
 
 #include <pd/base/log.H>
 #include <pd/base/config.H>
 #include <pd/base/assert.H>
+#include <pd/bq/bq_util.H>
+#include <pd/bq/bq_job.H>
+#include <pd/lightning/concurrent_heap.H>
+#include <pd/lightning/value.H>
 
 #include <phantom/io.H>
 #include <phantom/module.H>
 #include <phantom/io_acceptor_store/io_acceptor_store.H>
+#include <phantom/io_proposer_pool/io_proposer_pool.H>
 
 namespace phantom {
 
@@ -23,6 +29,7 @@ class io_paxos_structures_test_t : public io_t {
 public:
     struct config_t : public io_t::config_t {
         config::objptr_t<io_acceptor_store_t> acceptor_store;
+        config::objptr_t<io_proposer_pool_t> proposer_pool;
 
         void check(const in_t::ptr_t& p) const {
             io_t::config_t::check(p);
@@ -32,12 +39,22 @@ public:
     io_paxos_structures_test_t(const string_t& name,
                                const config_t& config)
         : io_t(name, config),
-          store_(config.acceptor_store) {}
+          store_(config.acceptor_store),
+          proposer_(config.proposer_pool) {}
+
 
     virtual void run() {
         log_info("Testing io_acceptor_store_t");
         test_acceptor_store();
         log_info("Finished testing io_acceptor_store_t");
+
+        log_info("Testing concurrent_heap_t<int, std::greater<int>>");
+        test_concurrent_heap();
+        log_info("Finished testing concurrent_heap_t<int, std::greater<int>>");
+
+        log_info("Testing io_proposer_pool_t");
+        test_proposer_pool();
+        log_info("finished testing io_proposer_pool_t");
 
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
@@ -109,6 +126,138 @@ public:
         // TODO(prime@): test nofity_commit()
     }
 
+    void test_concurrent_heap() {
+      concurrent_heap_t<int, std::greater<int>> heap;
+
+      log_info(" -- standart push-pop");
+      heap.push(5);
+      int value = -5;
+      assert(heap.pop(&value));
+      assert(value == 5);
+      assert(heap.empty());
+
+      log_info(" -- delayed pop");
+      test_delayed_pop(&heap);
+
+      log_info(" -- deactivation.");
+      test_deactivation(&heap);
+
+      log_info(" -- concurrent access");
+      test_concurrent_access();
+    }
+
+    void test_proposer_pool() {
+        instance_id_t iid(5);
+        ballot_id_t ballot(2);
+        value_t value;
+
+        log_info(" -- open instances heap");
+        proposer_->push_open(iid, ballot);
+        assert(proposer_->size());
+        assert(proposer_->pop_open(&iid, &ballot));
+
+        log_info(" -- failed instances heap");
+        proposer_->push_failed(iid, ballot);
+        assert(proposer_->size());
+        assert(proposer_->pop_failed(&iid, &ballot));
+
+        log_info(" -- reserved instances heap");
+        proposer_->push_reserved(iid, ballot, value);
+        assert(proposer_->size());
+        assert(proposer_->pop_reserved(&iid, &ballot, &value));
+
+        log_info(" -- purging");
+        proposer_->clear();
+        assert(proposer_->empty());
+    }
+
+    void pusher(concurrent_heap_t<int, std::greater<int>>* heap) {
+        for (size_t i = 0; i < 100; ++i) {
+            heap->push(i);
+        }
+    }
+
+    void poper(concurrent_heap_t<int, std::greater<int>>* heap) {
+        int value;
+
+        for (size_t i = 0; i < 100; ++i) {
+            assert(heap->pop(&value));
+        }
+    }
+
+    void assert_pop_success(concurrent_heap_t<int, std::greater<int>>* heap, bool result, const int value) {
+        int obtained_value = -6;
+        assert(result == heap->pop(&obtained_value));
+        assert(obtained_value == value);
+    }
+
+    void test_concurrent_access() {
+        concurrent_heap_t<int, std::greater<int>> heap;
+        for (size_t i = 0; i < 10; ++i) {
+            bq_job_t<typeof(
+                &io_paxos_structures_test_t::poper
+                )>::create(
+                    STRING("poper"),
+                    scheduler.bq_thr(),
+                    *this,
+                    &io_paxos_structures_test_t::poper,
+                    &heap
+            );
+
+            bq_job_t<typeof(
+                &io_paxos_structures_test_t::pusher
+                )>::create(
+                    STRING("pusher_"),
+                    scheduler.bq_thr(),
+                    *this,
+                    &io_paxos_structures_test_t::pusher,
+                    &heap
+             );
+        }
+
+        interval_t timeout = 10000 * interval_millisecond;
+        bq_sleep(&timeout);
+        return;
+    }
+
+    void test_deactivation(concurrent_heap_t<int, std::greater<int>>* heap) {
+        bq_job_t<typeof(
+            &io_paxos_structures_test_t::assert_pop_success
+            )>::create(
+                STRING("deactivation_unblocks"),
+                bq_thr_get(),
+                *this,
+                &io_paxos_structures_test_t::assert_pop_success,
+                heap,
+                false,
+                -6
+        );
+
+        heap->deactivate();
+        interval_t timeout = interval_second;
+        bq_sleep(&timeout);
+    }
+
+    void test_delayed_pop(concurrent_heap_t<int, std::greater<int>>* heap) {
+        const int VALUE = 2;
+        bq_job_t<typeof(
+            &io_paxos_structures_test_t::assert_pop_success
+            )>::create(
+                STRING("pop waiting for success"),
+                bq_thr_get(),
+                *this,
+                &io_paxos_structures_test_t::assert_pop_success,
+                heap,
+                true,
+                VALUE
+        );
+
+        interval_t timeout = interval_second;
+        bq_sleep(&timeout);
+
+        heap->push(VALUE);
+        bq_sleep(&timeout);
+    }
     virtual void init() {}
     virtual void fini() {}
     virtual void stat(pd::out_t& , bool) {}
@@ -117,13 +266,15 @@ public:
 
 private:
     io_acceptor_store_t* store_;
+    io_proposer_pool_t* proposer_;
 };
 
 namespace io_paxos_structures_test {
 config_binding_sname(io_paxos_structures_test_t);
 config_binding_value(io_paxos_structures_test_t, acceptor_store);
+config_binding_value(io_paxos_structures_test_t, proposer_pool);
 config_binding_parent(io_paxos_structures_test_t, io_t, 1);
 config_binding_ctor(io_t, io_paxos_structures_test_t);
-} // namespace io_ring_sender
+} // namespace io_paxos_structures_test
 
 } // namespace phantom

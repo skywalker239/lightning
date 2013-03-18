@@ -26,12 +26,12 @@ $(eval $(call MODULE,io_ring_sender,,pi lightning,))
 $(eval $(call MODULE,ring_handler,,pi lightning,))
 
 $(eval $(call MODULE,io_acceptor_store,,pi lightning,))
+$(eval $(call MODULE,io_proposer_pool,,pi lightning,))
 
 $(eval $(call MODULE,io_paxos_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase1_batch_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase1_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase2_executor,,pi lightning,))
-
 
 # test modules
 $(eval $(call MODULE,test_pd_lightning,,pi lightning,))
