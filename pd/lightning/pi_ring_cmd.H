@@ -9,6 +9,7 @@
 
 #include <pd/lightning/pi_ext.H>
 #include <pd/lightning/defs.H>
+#include <pd/lightning/value.H>
 
 namespace pd {
 
@@ -27,16 +28,17 @@ namespace cmd {
  *
  * where body depends on cmd_type.
  *
- * PHASE1_BATCH:
+ * BATCH:
  *   body ::= [start_iid end_iid ballot_id failed_instances_array]
  *   failed_instances_array ::= [failed_instance...]
  *   failed_instance ::= [iid highest_promise instance_status]
  *
- * PHASE1:
- *   body ::= [iid instance_status highest_promise? value? value_id?]
+ * PROMISE:
+ *   body ::= [iid instance_status fail?]
+ *   fail ::= highest_promise highest_proposed last_proposal?
  *
- * PHASE2:
- *   body ::=
+ * VOTE:
+ *   body ::= [iid ballot_id value_id]
  */
 
 namespace ring {
@@ -45,19 +47,6 @@ namespace ring {
         BATCH = 1,
         PROMISE = 2,
         VOTE = 3
-    };
-
-    // NOTE: enum send over network, do not change existing values
-    enum class instance_status_t {
-        // instance is open, but ballot_id is to low
-        LOW_BALLOT_ID = 1,
-        // instance value != NULL
-        RESERVED = 2,
-        OPEN = 3,
-        // acceptor would never participate in this instance because it is
-        // too old(forgotten or dead)
-        IID_TOO_LOW = 4,
-        IID_TOO_HIGH = 5
     };
 
     struct header_t {
@@ -75,6 +64,7 @@ namespace ring {
 
     inline request_id_t request_id(const ref_t<pi_ext_t>& cmd) {
         return cmd->pi().s_ind(1).s_ind(0).s_int();
+
     }
 
     inline ring_id_t ring_id(const ref_t<pi_ext_t>& cmd) {
@@ -90,7 +80,6 @@ namespace batch {
     struct fail_t {
         instance_id_t iid;
         ballot_id_t highest_promised;
-        ring::instance_status_t status;
     };
 
     struct body_t {
@@ -131,15 +120,50 @@ namespace batch {
         return fail.s_ind(1).s_int();
     }
 
-    inline ring::instance_status_t fail_status(const pi_t& fail) {
-        return static_cast<ring::instance_status_t>(fail.s_ind(2).s_int());
-    }
-
     bool is_body_valid(const ref_t<pi_ext_t>& ring_cmd);
 } // namespace batch
 
 namespace promise {
+    // NOTE: enum send over network, do not change existing values
+    enum class status_t {
+        SUCCESS = 1,
+        // either 1) instance is open, but ballot_id is too low
+        //        2) value != NULL
+        //        3) iid is to high
+        FAILED = 2,
+    };
 
+    struct fail_t {
+        ballot_id_t highest_promised;
+        ballot_id_t highest_proposed;
+        value_t* last_proposal;
+    };
+
+    struct body_t {
+        instance_id_t iid;
+        ballot_id_t ballot_id;
+        status_t status;
+        fail_t* fail;
+    };
+
+    ref_t<pi_ext_t> build(const ring::header_t& header,
+                          const body_t& body);
+
+    inline instance_id_t iid(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_ind(0).s_int();
+    }
+
+    inline ballot_id_t ballot_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_ind(1).s_int();
+    }
+
+    inline status_t status(const ref_t<pi_ext_t>& cmd) {
+        return static_cast<status_t>(cmd->pi().s_ind(2).s_ind(2).s_int());
+    }
+
+    ballot_id_t highest_promised(const ref_t<pi_ext_t>& cmd);
+    ballot_id_t highest_proposed(const ref_t<pi_ext_t>& cmd);
+    value_t& last_proposal(const ref_t<pi_ext_t>& cmd);
 } // namespace promise
 
 namespace vote {

@@ -30,7 +30,6 @@ public:
 
         config_t() throw()
             : batch_size(1024) {}
-        ~config_t() throw() {}
         void check(const in_t::ptr_t& p) const;
     };
 

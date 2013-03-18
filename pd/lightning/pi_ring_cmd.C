@@ -91,7 +91,7 @@ bool is_body_valid(const ref_t<pi_ext_t>& ring_cmd) {
     auto fail = pi_t::array_t::c_ptr_t(body.s_ind(3).__array());
     for(; fail; ++fail) {
         if(fail->type() != pi_t::_array ||
-           fail->__array()._count() != 3 ||
+           fail->__array()._count() != 2 ||
            start_iid(ring_cmd) > fail_iid(*fail) ||
            end_iid(ring_cmd) <= fail_iid(*fail))
         {
@@ -111,29 +111,10 @@ std::vector<fail_t> fails_pi_to_vector(const pi_t::array_t& fails) {
         instances.push_back({
             fail_iid(fails[i]),
             fail_highest_promise(fails[i]),
-            fail_status(fails[i])
         });
     }
 
     return instances;
-}
-
-instance_status_t merge_status(instance_status_t local,
-                               instance_status_t received) {
-    if(local == instance_status_t::OPEN && received == instance_status_t::OPEN) {
-        return instance_status_t::OPEN;
-    } else if(local == instance_status_t::IID_TOO_LOW ||
-              received == instance_status_t::IID_TOO_LOW) {
-        return instance_status_t::IID_TOO_LOW;
-    } else if(local == instance_status_t::IID_TOO_HIGH ||
-              received == instance_status_t::IID_TOO_HIGH) {
-        return instance_status_t::IID_TOO_HIGH;
-    } else if(local == instance_status_t::RESERVED ||
-              received == instance_status_t::RESERVED) {
-        return instance_status_t::RESERVED;
-    } else {
-        return instance_status_t::LOW_BALLOT_ID;
-    }
 }
 
 std::vector<fail_t> merge_fails(const std::vector<fail_t>& local,
@@ -156,9 +137,7 @@ std::vector<fail_t> merge_fails(const std::vector<fail_t>& local,
             merged.push_back({
                 local_instance->iid,
                 max(local_instance->highest_promised,
-                    received_instance->highest_promised),
-                merge_status(local_instance->status,
-                             received_instance->status)
+                    received_instance->highest_promised)
             });
             ++local_instance;
             ++received_instance;
@@ -181,19 +160,16 @@ std::vector<fail_t> merge_fails(const std::vector<fail_t>& local,
 ref_t<pi_ext_t> build(const ring::header_t& header, const body_t& body) {
     pi_t::pro_t fails_pros[body.fails.size()];
     pi_t::pro_t::array_t fails_arrays[body.fails.size()];
-    pi_t::pro_t fails_fields[body.fails.size()][3];
+    pi_t::pro_t fails_fields[body.fails.size()][2];
 
-    static_assert((&(fails_fields[0][3]) - &(fails_fields[0][0])) != 3 * sizeof(pi_t::pro_t),
+    static_assert((&(fails_fields[0][2]) - &(fails_fields[0][0])) != 2 * sizeof(pi_t::pro_t),
                   "prime@ was wrong about 2D array memory layout");
 
     for(size_t i = 0; i < body.fails.size(); ++i) {
         fails_fields[i][0] = pi_t::pro_t::uint_t(body.fails[i].iid);
         fails_fields[i][1] = pi_t::pro_t::uint_t(body.fails[i].highest_promised);
-        fails_fields[i][2] = pi_t::pro_t::uint_t(
-            static_cast<uint8_t>(body.fails[i].status)
-        );
 
-        fails_arrays[i] = { 3, fails_fields[i] };
+        fails_arrays[i] = { 2, fails_fields[i] };
         fails_pros[i] = fails_arrays[i];
     }
 

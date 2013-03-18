@@ -98,6 +98,10 @@ void io_phase2_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
 
 void io_phase2_executor_t::handle(ref_t<pi_ext_t> udp_cmd,
                                   const netaddr_t& /* remote_addr */) {
+    if(is_master()) {
+        log_debug("ignoring udp cmd on master");
+    }
+
     if(!udp::is_valid(udp_cmd)) {
         log_warning("received invalid udp cmd");
         return;
