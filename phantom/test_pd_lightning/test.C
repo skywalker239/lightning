@@ -367,8 +367,7 @@ private:
 
         assert(!acceptor.pending_vote_ready(&vote));
 
-        value_t value;
-        value.set(15, STRING("foo bar"));
+        value_t value(15, STRING("foo bar"));
 
         acceptor.propose(14, value);
 
@@ -388,8 +387,7 @@ private:
 
         assert(!acceptor.vote(vote));
 
-        value_t value;
-        value.set(15, STRING("foo bar"));
+        value_t value(15, STRING("foo bar"));
 
         acceptor.propose(14, value);
 
@@ -418,8 +416,7 @@ private:
         assert(!acceptor.committed());
         assert(!acceptor.committed_value().valid());
 
-        value_t value;
-        value.set(16, STRING("foo bar"));
+        value_t value(16, STRING("foo bar"));
 
         assert(acceptor.propose(16, value));
 
@@ -437,8 +434,7 @@ private:
 
         assert(acceptor.promise(1, NULL, NULL, NULL));
 
-        value_t value;
-        value.set(16, STRING("foo bar"));
+        value_t value(16, STRING("foo bar"));
 
         assert(acceptor.propose(1, value));
 

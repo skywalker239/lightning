@@ -41,6 +41,7 @@ $(eval $(call MODULE,io_paxos_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase1_batch_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase1_executor,,pi lightning,))
 $(eval $(call MODULE,io_phase2_executor,,pi lightning,))
+$(eval $(call MODULE,io_stream/proto_value_receiver,,pi lightning,))
 
 # test modules
 $(eval $(call MODULE,test_pd_lightning,,pi lightning,))
@@ -49,6 +50,10 @@ $(eval $(call MODULE,test_ring,,pi lightning,))
 $(eval $(call MODULE,test_blob_multicast,,pi lightning,))
 $(eval $(call MODULE,test_executors,,pi lightning,))
 $(eval $(call MODULE,test_paxos_structures,,pi lightning,))
+
+include /usr/share/phantom/test.mk
+
+$(eval $(call TEST,lightning,pi,pd-base))
 
 FIXINC = -isystem . -isystem /usr/include/pd/fixinclude
 

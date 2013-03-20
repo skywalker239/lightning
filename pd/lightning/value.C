@@ -9,8 +9,13 @@
 
 namespace pd {
 
-value_t::value_t()
+value_t::value_t() throw()
 {}
+
+value_t::value_t(value_id_t value_id, const string_t& value)
+{
+    set(value_id, value);
+}
 
 void value_t::set(value_id_t value_id, const string_t& value) {
     pi_t::pro_t::item_t id_item(pi_t::pro_t::uint_t(value_id), NULL);
@@ -35,11 +40,11 @@ bool value_t::set(const pi_t& pi_value) {
     return true;
 }
 
-bool value_t::valid() const {
+bool value_t::valid() const throw() {
     return value_ != NULL;
 }
 
-value_id_t value_t::value_id() const {
+value_id_t value_t::value_id() const throw() {
     return value_ ?
                value_->pi().s_ind(0).s_uint() :
                INVALID_VALUE_ID;
@@ -54,7 +59,7 @@ const string_t value_t::value() const {
     }
 }
 
-const pi_t& value_t::pi_value() const {
+const pi_t& value_t::pi_value() const throw() {
     return value_->pi();
 }
 

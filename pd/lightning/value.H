@@ -5,7 +5,6 @@
 // vim: set tabstop=4 expandtab:
 #pragma once
 
-#include <pd/base/string.H>
 #include <pd/lightning/defs.H>
 #include <pd/lightning/pi_ext.H>
 
@@ -13,13 +12,12 @@ namespace pd {
 
 //! Represents a Paxos value.
 //  A value is simply a string with a unique identifier.
+
 class value_t {
 public:
     //! Constructs an empty (invalid) value.
-    value_t();
-
-    //! Sets the value to (value_id, value).
-    void set(value_id_t value_id, const string_t& value);
+    value_t() throw();
+    value_t(value_id_t value_id, const string_t& value);
 
     //! Sets the value from a serialized value.
     //  Returns false iff the serialized value was malformed.
@@ -29,15 +27,17 @@ public:
     bool valid() const;
 
     //! Value id.
-    value_id_t value_id() const;
+    value_id_t value_id() const throw();
 
     //! Value data.
     const string_t value() const;
 
     //! Serialized value.
-    const pi_t& pi_value() const;
- 
+    const pi_t& pi_value() const throw();
 private:
+    //! Sets the value to (value_id, value).
+    void set(value_id_t value_id, const string_t& value);
+
     ref_t<pi_ext_t> value_;
 };
 

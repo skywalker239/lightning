@@ -14,7 +14,7 @@ namespace pd {
 class guid_generator_t {
 public:
     guid_generator_t(host_id_t host_id) throw();
-    ~guid_generator_t() throw() { };
+    inline ~guid_generator_t() throw() { }
 
     uint64_t get_guid();
 private:
