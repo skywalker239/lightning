@@ -35,7 +35,12 @@ public:
     proto_value_receiver_t(const string_t&, const config_t& config) throw();
     inline ~proto_value_receiver_t() throw() { }
     void set_master(bool master) throw();
+    size_t get_recv_count() const throw();
+    value_id_t get_last_pushed_value_id() const throw();
 private:
+    std::atomic<size_t> received_count_;
+    std::atomic<value_id_t> last_pushed_id_;
+
     std::atomic<bool> master_;
     io_proposer_pool_t& proposer_pool_;
     io_guid_t& value_id_generator_;

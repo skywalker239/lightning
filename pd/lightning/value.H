@@ -5,6 +5,7 @@
 // vim: set tabstop=4 expandtab:
 #pragma once
 
+#include <pd/base/string.H>
 #include <pd/lightning/defs.H>
 #include <pd/lightning/pi_ext.H>
 
@@ -12,6 +13,7 @@ namespace pd {
 
 //! Represents a Paxos value.
 //  A value is simply a string with a unique identifier.
+//  TODO: use something instead string_t
 
 class value_t {
 public:

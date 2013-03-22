@@ -27,7 +27,7 @@ static inline void __test(string_t const &string) {
 
     try {
         in_t::ptr_t ptr = string;
-        parsed = pi_ext_t::parse(ptr, &pi_t::parse_text);;
+        parsed = pi_ext_t::parse(ptr, &pi_t::parse_text);
         out.print(parsed->pi(), "10")(';').lf();
     }
     catch(exception_t const &ex) {
