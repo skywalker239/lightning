@@ -36,7 +36,7 @@ public:
 
     //! Serialized value.
     const pi_t& pi_value() const;
- 
+
 private:
     ref_t<pi_ext_t> value_;
 };

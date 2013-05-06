@@ -14,7 +14,24 @@ namespace phantom {
 
 MODULE(io_phase2_executor);
 
+namespace io_phase2_executor {
+config_binding_sname(io_phase2_executor_t);
+config_binding_parent(io_phase2_executor_t, io_paxos_executor_t, 1);
+config_binding_ctor(io_t, io_phase2_executor_t);
+//config_binding_ctor(io_blob_receiver::handler_t, io_phase2_executor_t);
+
+config_binding_value(io_phase2_executor_t, blob_sender);
+config_binding_value(io_phase2_executor_t, udp_guid_generator);
+} // namespace io_phase2_executor
+
 using namespace pd::cmd;
+
+io_phase2_executor_t::io_phase2_executor_t(const string_t& name,
+                                           const config_t& config)
+    : io_paxos_executor_t(name, config),
+      blob_sender_(config.blob_sender),
+      udp_guid_generator_(config.udp_guid_generator) {}
+
 
 void io_phase2_executor_t::run_proposer() {
     while(true) {

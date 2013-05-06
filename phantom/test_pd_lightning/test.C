@@ -56,6 +56,8 @@ public:
 
         test_pi_initializer_list();
 
+        test_pibf_parse();
+
         log_info("All tests finished");
         log_info("Sending SIGQUIT");
         kill(getpid(), SIGQUIT);
@@ -482,7 +484,20 @@ private:
             }
         ));
 
-        print_pi(pi);
+//        print_pi(pi);
+    }
+
+    void test_pibf_parse() {
+        ref_t<pi_ext_t> pibf(pi_ext_t::__build(
+            CSTR("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        ));
+
+        string_t::ctor_t ctor(100000);
+        pi_t::print_app(ctor, &pibf->root());
+        string_t str(ctor);
+
+        in_t::ptr_t in(str);
+        ref_t<pi_ext_t> huge_cmd_copy = pi_ext_t::parse(in, &pi_t::parse_app);
     }
 
     void print_pi(ref_t<pi_ext_t> pi) {

@@ -27,14 +27,31 @@ namespace udp {
 } // namespace udp
 
 namespace propose {
-    request_id_t request_id(const ref_t<pi_ext_t>& cmd);
-    instance_id_t iid(const ref_t<pi_ext_t>& cmd);
-    ballot_id_t ballot_id(const ref_t<pi_ext_t>& cmd);
+    inline request_id_t request_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(1).s_int();
+    }
 
-    value_id_t value_id(const ref_t<pi_ext_t>& cmd);
-    const pi_t::string_t& value_str(const ref_t<pi_ext_t>& cmd);
+    inline instance_id_t iid(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_int();
+    }
 
-    value_t value(const ref_t<pi_ext_t>& cmd);
+    inline ballot_id_t ballot_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(3).s_int();
+    }
+
+    // inline value_id_t value_id(const ref_t<pi_ext_t>& cmd) {
+    //     return cmd->pi().s_ind(4).s_int();
+    // }
+
+    // inline const pi_t::string_t& value_str(const ref_t<pi_ext_t>& cmd) {
+    //     return cmd->pi().s_ind(5).__string();
+    // }
+
+    inline value_t value(const ref_t<pi_ext_t>& cmd) {
+        value_t value;
+        value.set(cmd->pi().s_ind(4));
+        return value;
+    }
 
     ref_t<pi_ext_t> build(request_id_t request_id,
                           instance_id_t iid,
@@ -43,8 +60,13 @@ namespace propose {
 } // namespace propose
 
 namespace commit {
-    instance_id_t iid(const ref_t<pi_ext_t>& cmd);
-    value_id_t value_id(const ref_t<pi_ext_t>& cmd);
+    inline instance_id_t iid(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(1).s_int();
+    }
+
+    inline value_id_t value_id(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_int();
+    }
 
     ref_t<pi_ext_t> build(instance_id_t iid, value_id_t value_id);
 } // namespace commit

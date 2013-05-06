@@ -52,7 +52,7 @@ io_blob_receiver_t::io_blob_receiver_t(const string_t& name, const config_t& con
     : io_t(name, config),
       address_(netaddr_ipv4_t(config.address, config.port)),
       multicast_(config.multicast),
-      handler_(*config.handler),
+      handler_(config.handler),
       fragment_pool_(config.pending_blob_limit, config.hash_table_size),
       fd_(-1)
 {}
@@ -134,16 +134,29 @@ void io_blob_receiver_t::run() {
             continue;
         }
 
-        // log_debug("received blob part(guid=%ld, size=%d, begin=%d, part_num=%d)",
-        //           header->guid, header->size, header->begin, header->part_num);
+//        log_debug("received blob part(guid=%ld, total_size=%d, begin=%d, part_num=%d, size=%ld)",
+//                  header->guid, header->size, header->begin, header->part_num, data_length);
 
         ref_t<blob_fragment_pool_t::blob_t> blob = fragment_pool_.lookup(header->guid, header->size);
 
+        // TODO(prime@): ugly with lots of copying, rewrite
         if(blob->update(header->begin, str_t(data, data_length))) {
-                // log_debug("blob completed(guid=%ld)", header->guid);
+//                log_debug("blob completed(guid=%ld)", header->guid);
 
                 fragment_pool_.remove(header->guid);
-                // TODO(prime@): parse pibf and send it to handler
+
+                string_t blob_str = string(blob->get_data());
+
+                ref_t<pi_ext_t> udp_cmd;
+                try {
+                    auto in = in_t::ptr_t(blob_str);
+
+                    udp_cmd = pi_ext_t::parse(in, &pi_t::parse_app);
+
+                    handler_->handle(udp_cmd, remote_addr);
+                } catch(exception_t& ex) {
+                    ex.log();
+                }
         }
     }
 }

@@ -57,7 +57,7 @@ private:
 
     const netaddr_ipv4_t address_;
     const bool multicast_;
-    handler_t& handler_;
+    handler_t* handler_;
 
     blob_fragment_pool_t fragment_pool_;
 

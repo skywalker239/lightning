@@ -18,7 +18,7 @@ namespace phantom {
 class io_phase1_executor_t : public io_paxos_executor_t {
 public:
     struct config_t : public io_paxos_executor_t::config_t {
-        void check(const in_t::ptr_t& p) const;
+        void check(const in_t::ptr_t&) const {}
     };
 
     io_phase1_executor_t(const string_t& name,

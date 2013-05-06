@@ -202,7 +202,7 @@ ref_t<pi_ext_t> build(const ring::header_t& ,
     return NULL;
 }
 
-} // namespace propose
+} // namespace promise
 
 namespace vote {
 

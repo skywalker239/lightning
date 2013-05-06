@@ -19,8 +19,11 @@ namespace phantom {
 class io_phase2_executor_t : public io_paxos_executor_t,
                              public io_blob_receiver::handler_t {
 public:
-    struct config_t : public io_t::config_t {
+    struct config_t : public io_paxos_executor_t::config_t {
         config::objptr_t<io_blob_sender_t> blob_sender;
+        config::objptr_t<io_guid_t> udp_guid_generator;
+
+        void check(const in_t::ptr_t& ) const {}
     };
 
     io_phase2_executor_t(const string_t& name,

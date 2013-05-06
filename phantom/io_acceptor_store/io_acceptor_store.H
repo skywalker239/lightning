@@ -42,7 +42,7 @@ public:
         // Instance found in store.
         OK,
         // Instance can't be created because store is full.
-        // E.g. instance is to far ahead from last snapshot.
+        // E.g. instance is too far ahead from last snapshot.
         UNREACHABLE,
         // Acceptor is not allowed to participate in this instance yet.
         BEHIND_WALL

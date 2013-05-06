@@ -628,11 +628,13 @@ pi_t::root_t *pi_t::parse_app(
 ) {
 	in_t::ptr_t ptr = _ptr;
 	_size_t _size = 0;
-	for(int i = 0; i < 32; i += 8)
-		_size |= (*(ptr++) << i);
+	for(int i = 0; i < 32; i += 8) {
+		_size |= (((unsigned char)(*ptr)) << i);
+		++ptr;
+	}
 
-	size_t size = _size * sizeof(pi_t); // TODO(prime@): sanitize
-                                        // input here
+	size_t size = _size * sizeof(pi_t); // TODO(prime@): sanitize input here
+
 	char *buf = (char *)mem.alloc(size);
 
 	try {

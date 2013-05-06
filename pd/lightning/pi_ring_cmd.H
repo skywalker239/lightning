@@ -64,7 +64,6 @@ namespace ring {
 
     inline request_id_t request_id(const ref_t<pi_ext_t>& cmd) {
         return cmd->pi().s_ind(1).s_ind(0).s_int();
-
     }
 
     inline ring_id_t ring_id(const ref_t<pi_ext_t>& cmd) {
@@ -161,9 +160,19 @@ namespace promise {
         return static_cast<status_t>(cmd->pi().s_ind(2).s_ind(2).s_int());
     }
 
-    ballot_id_t highest_promised(const ref_t<pi_ext_t>& cmd);
-    ballot_id_t highest_proposed(const ref_t<pi_ext_t>& cmd);
-    value_t& last_proposal(const ref_t<pi_ext_t>& cmd);
+    inline ballot_id_t highest_promised(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_ind(3).s_int();
+    }
+
+    inline ballot_id_t highest_proposed(const ref_t<pi_ext_t>& cmd) {
+        return cmd->pi().s_ind(2).s_ind(4).s_int();
+    }
+
+    inline value_t last_proposal(const ref_t<pi_ext_t>& cmd) {
+        value_t value;
+        value.set(cmd->pi().s_ind(2).s_ind(5));
+        return value;
+    }
 } // namespace promise
 
 namespace vote {

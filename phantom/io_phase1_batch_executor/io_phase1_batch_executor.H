@@ -50,9 +50,12 @@ private:
     bool next_batch_start(instance_id_t* start);
     ref_t<pi_ext_t> propose_batch(instance_id_t batch_start);
     void push_to_proposer_pool(const ref_t<pi_ext_t>& ring_reply);
+
+    // return false if iid is too old
     bool accept_one_instance(instance_id_t iid,
                              ballot_id_t ballot_id,
                              cmd::batch::fail_t* fail);
+
     void update_and_send_to_next(const ref_t<pi_ext_t>& received_cmd,
                                  const std::vector<cmd::batch::fail_t>& fails);
 

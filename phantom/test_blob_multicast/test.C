@@ -91,25 +91,27 @@ private:
 
         sender_->send(0, cmd);
 
-        std::vector<cmd::batch::fail_t> fails(1000);
+        for(int i = 0; i < 30000; ++i) {
+            std::vector<cmd::batch::fail_t> fails(i);
 
-        ref_t<pi_ext_t> huge_cmd = cmd::batch::build(
-            {
-                request_id: 52,
-                ring_id: 1,
-                dst_host_id: 3
-            },
-            {
-                start_iid: 1024,
-                end_iid: 2048,
-                ballot_id: 7,
-                fails: fails
-            }
-        );
+            ref_t<pi_ext_t> huge_cmd = cmd::batch::build(
+                {
+                    request_id: 52,
+                    ring_id: 1,
+                    dst_host_id: 3
+                },
+                {
+                    start_iid: 1024,
+                    end_iid: 2048,
+                    ballot_id: 7,
+                    fails: fails
+                }
+            );
 
-        sender_->send(1, huge_cmd);
+            sender_->send(i + 1, huge_cmd);
+        }
 
-        interval_t timeout = interval_millisecond * 100;
+        interval_t timeout = interval_millisecond * 1024 * 8;
         bq_sleep(&timeout);
     }
 

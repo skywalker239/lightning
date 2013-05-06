@@ -15,6 +15,12 @@ using namespace pd::cmd;
 
 MODULE(io_phase1_batch_executor);
 
+namespace io_phase1_batch_executor {
+config_binding_sname(io_phase1_batch_executor_t);
+config_binding_parent(io_phase1_batch_executor_t, io_paxos_executor_t, 1);
+config_binding_ctor(io_t, io_phase1_batch_executor_t);
+} // namespace io_phase1_batch_executor
+
 void io_phase1_batch_executor_t::config_t::check(const in_t::ptr_t& ) const {
 //    TODO(prime@): sanitize config
 }
@@ -24,6 +30,10 @@ io_phase1_batch_executor_t::io_phase1_batch_executor_t(
         const config_t& config)
     : io_paxos_executor_t(name, config),
       batch_size_(config.batch_size) {}
+
+void io_phase1_batch_executor_t::set_start_iid(instance_id_t start_iid) {
+    next_batch_start_ = start_iid;
+}
 
 ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
         instance_id_t batch_start) {
@@ -36,11 +46,11 @@ ref_t<pi_ext_t> io_phase1_batch_executor_t::propose_batch(
 
         wait_pool_t::item_t wait_reply(cmd_wait_pool_, request_id);
 
-        accept_ring_cmd(cmd::batch::build(
+        accept_ring_cmd(batch::build(
             {
                 request_id: request_id,
                 ring_id: ring_state.ring_id,
-                dst_host_id: host_id_  // sending to local acceptor
+                dst_host_id: host_id_ // sending to local acceptor
             },
             {
                 start_iid: batch_start,
@@ -75,7 +85,7 @@ bool io_phase1_batch_executor_t::next_batch_start(instance_id_t* start) {
     next_batch_start_ += batch_size_;
 
     // TODO(prime@): come up with logic for batcher throttling
-    // calling under lock, so batch intervals are strongly increasing
+
     // return proposer_pool_->may_start_batch(*start, next_batch_start_);
     return true;
 }
@@ -118,42 +128,6 @@ void io_phase1_batch_executor_t::push_to_proposer_pool(
     }
 }
 
-bool io_phase1_batch_executor_t::accept_one_instance(
-        instance_id_t iid,
-        ballot_id_t ballot_id,
-        batch::fail_t* fail) {
-    ref_t<acceptor_instance_t> instance;
-    io_acceptor_store_t::err_t err = acceptor_store_->lookup(iid, &instance);
-
-    if(err == io_acceptor_store_t::DEAD) {
-        assert(!"This should never happend");
-    } else if(err == io_acceptor_store_t::FORGOTTEN) {
-        return true;
-    } else if(err == io_acceptor_store_t::BEHIND_WALL ||
-              err == io_acceptor_store_t::UNREACHABLE) {
-        fail->iid = iid;
-        fail->highest_promised = ballot_id;
-        return false;
-    } else {
-        assert(instance);
-
-        ballot_id_t highest_promised = INVALID_BALLOT_ID;
-
-        bool promise_succeeded = instance->promise(ballot_id,
-                                                   &highest_promised,
-                                                   NULL,
-                                                   NULL);
-
-        if(promise_succeeded) {
-            return true;
-        } else {
-            fail->iid = iid;
-            fail->highest_promised = highest_promised;
-            return false;
-        }
-    }
-}
-
 void io_phase1_batch_executor_t::update_and_send_to_next(
         const ref_t<pi_ext_t>& received_cmd,
         const std::vector<batch::fail_t>& localy_failed) {
@@ -183,21 +157,55 @@ void io_phase1_batch_executor_t::update_and_send_to_next(
     ));
 }
 
+bool io_phase1_batch_executor_t::accept_one_instance(
+        instance_id_t iid,
+        ballot_id_t ballot_id,
+        batch::fail_t* fail) {
+    ref_t<acceptor_instance_t> instance;
+    io_acceptor_store_t::err_t err = acceptor_store_->lookup(iid, &instance);
+
+    if(err == io_acceptor_store_t::DEAD ||
+       err == io_acceptor_store_t::FORGOTTEN) {
+        return false;
+    } else if(err == io_acceptor_store_t::BEHIND_WALL ||
+              err == io_acceptor_store_t::UNREACHABLE) {
+        fail->iid = iid;
+        fail->highest_promised = ballot_id;
+        return true;
+    } else {
+        assert(instance);
+
+        ballot_id_t highest_promised = INVALID_BALLOT_ID;
+
+        bool promise_succeeded = instance->promise(ballot_id,
+                                                   &highest_promised,
+                                                   NULL,
+                                                   NULL);
+
+        if(!promise_succeeded) {
+            fail->iid = iid;
+            fail->highest_promised = highest_promised;
+        }
+
+        return true;
+    }
+}
+
 void io_phase1_batch_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
     std::vector<batch::fail_t> all_failed;
-
-    if(batch::start_iid(ring_cmd) < acceptor_store_->birth()) {
-        // ignore request's to participate in instances from previous life
-        return;
-    }
 
     for(instance_id_t iid = batch::start_iid(ring_cmd);
         iid < batch::end_iid(ring_cmd);
         ++iid)
     {
         batch::fail_t fail;
+        fail.iid = INVALID_INSTANCE_ID;
 
         if(!accept_one_instance(iid, batch::ballot_id(ring_cmd), &fail)) {
+            return; // iid too low
+        }
+
+        if(fail.iid != INVALID_INSTANCE_ID) {
             all_failed.push_back(fail);
         }
     }

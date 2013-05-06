@@ -13,10 +13,65 @@
 
 namespace phantom {
 
+MODULE(io_phase1_executor);
+
+namespace io_phase1_executor {
+config_binding_sname(io_phase1_executor_t);
+config_binding_parent(io_phase1_executor_t, io_paxos_executor_t, 1);
+config_binding_ctor(io_t, io_phase1_executor_t);
+} // namespace io_phase1_executor
+
 using namespace cmd;
 
-void io_phase1_executor_t::run_proposer() {
+io_phase1_executor_t::io_phase1_executor_t(const string_t& name,
+                                           const config_t& config)
+    : io_paxos_executor_t(name, config) {}
 
+
+void io_phase1_executor_t::run_proposer() {
+    while(true) {
+        request_id_t request_id = request_id_generator_->get_guid();
+        ring_state_t ring_state = ring_state_snapshot();
+
+        instance_id_t iid;
+        ballot_id_t ballot_id;
+
+        if(!proposer_pool_->pop_failed(&iid, &ballot_id)) {
+            return;
+        }
+
+        wait_pool_t::item_t wait_reply(cmd_wait_pool_, request_id);
+
+        accept_ring_cmd(promise::build(
+            {
+                request_id: request_id,
+                ring_id: ring_state.ring_id,
+                dst_host_id: host_id_
+            },
+            {
+                iid: iid,
+                ballot_id: ballot_id,
+                status: promise::status_t::SUCCESS,
+                fail: NULL
+            }
+        ));
+
+        interval_t timeout = ring_reply_timeout_;
+        ref_t<pi_ext_t> reply = wait_reply->wait(&timeout);
+        if(!reply) {
+            proposer_pool_->push_failed(iid, next_ballot_id(ballot_id, host_id_));
+        }
+
+        if(promise::status(reply) == promise::status_t::SUCCESS) {
+            proposer_pool_->push_open(iid, ballot_id);
+        } else {
+            if(promise::highest_promised(reply) == ballot_id) {
+                proposer_pool_->push_reserved(iid, ballot_id, promise::last_proposal(reply));
+            } else {
+                proposer_pool_->push_failed(iid, next_ballot_id(promise::highest_promised(reply), host_id_));
+            }
+        }
+    }
 }
 
 void io_phase1_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
@@ -71,8 +126,10 @@ void io_phase1_executor_t::accept_ring_cmd(const ref_t<pi_ext_t>& ring_cmd) {
             fail.highest_proposed = highest_proposed;
             fail.last_proposal = &old_proposal;
         } else {
+            old_proposal = promise::last_proposal(ring_cmd);
+
             fail.highest_proposed = promise::highest_proposed(ring_cmd);
-            fail.last_proposal = &promise::last_proposal(ring_cmd);
+            fail.last_proposal = &old_proposal;
         }
     }
 
