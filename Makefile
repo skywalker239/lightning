@@ -46,6 +46,9 @@ $(eval $(call MODULE,io_phase2_executor,,pi lightning,))
 
 $(eval $(call MODULE,io_lightning_static_server,,pi lightning,))
 
+$(eval $(call MODULE,io_raft_consensus,,pi lightning,))
+$(eval $(call MODULE,io_lightning_network,,pi lightning,))
+
 # test modules
 $(eval $(call MODULE,io_gtest_runner,,gtest,))
 $(eval $(call MODULE,test_gtests,,,))

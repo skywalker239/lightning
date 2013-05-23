@@ -9,6 +9,13 @@
 
 namespace pd {
 
+typedef uint64_t iid_t;
+typedef int32_t replica_id_t;
+typedef uint64_t term_t;
+
+const replica_id_t INVALID_REPLICA_ID = 0;
+const iid_t INVALID_IID = ~0ULL;
+
 typedef uint64_t instance_id_t;
 typedef uint32_t ballot_id_t;
 typedef uint64_t request_id_t;
